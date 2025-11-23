@@ -6,7 +6,7 @@
 # Architectural Patterns
 - **Directory Structure:**
   - `app/`: Pages and layouts. Use `app/dashboard/` for authenticated views.
-  - `lib/`: Shared logic. `lib/firebase.ts` for init, `lib/googleApi.ts` for API calls.
+  - `lib/`: Shared logic. `lib/firebase.ts` for init, `lib/gmailApi.ts` for API calls.
   - `contexts/`: Global state, specifically `AuthContext.tsx`.
 - **Authentication (Critical):**
   - Use Firebase Authentication with `GoogleAuthProvider`.

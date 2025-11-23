@@ -80,7 +80,7 @@ my-workspace-dash/
 │       └── layout.tsx    # サイドバーなどを配置
 ├── lib/
 │   ├── firebase.ts       # Firebase初期化とAuth設定
-│   └── googleApi.ts      # Gmail/Calendar等のAPIを叩く関数群
+│   └── gmailApi.ts       # Gmail/Calendar等のAPIを叩く関数群
 ├── contexts/
 │   └── AuthContext.tsx   # ログイン状態とアクセストークンを管理
 └── .env.local            # 環境変数 (APIキーなど)
