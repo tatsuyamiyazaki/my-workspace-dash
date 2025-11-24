@@ -4,6 +4,7 @@ import {
   collection, addDoc, updateDoc, deleteDoc, doc,
   query, orderBy, onSnapshot, serverTimestamp, FieldValue 
 } from "firebase/firestore";
+
 export interface Note {
   id: string;
   content: string;
@@ -48,7 +49,7 @@ export const createNote = async (uid: string, content: string, color: string = '
 export const updateNote = async (uid: string, noteId: string, content: string, color?: string) => {
   interface NoteUpdateData {
     content: string;
-    updatedAt: FieldValue; // serverTimestamp() returns FieldValue
+    updatedAt: FieldValue;
     color?: string;
   }
 
@@ -59,7 +60,8 @@ export const updateNote = async (uid: string, noteId: string, content: string, c
   if (color) data.color = color;
   
   const noteRef = doc(db, "users", uid, "notes", noteId);
-  await updateDoc(noteRef, data);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await updateDoc(noteRef, data as any); 
 };
 
 // メモの削除

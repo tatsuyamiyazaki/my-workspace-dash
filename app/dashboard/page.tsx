@@ -4,8 +4,8 @@ import SummaryCards from './_components/SummaryCards';
 import CalendarView from './_components/CalendarView';
 import MailList from './_components/MailList';
 import TaskList from './_components/TaskList';
-import FixedLinkList from './_components/FixedLinkList'; // New import
-import CustomLinkList from './_components/CustomLinkList'; // Renamed import
+import FixedLinkList from './_components/FixedLinkList';
+import CustomLinkList from './_components/CustomLinkList';
 import NotesWidget from './_components/NotesWidget';
 import EventNotifications from './_components/EventNotifications';
 import { useAuth, useSettings } from '@/contexts/AuthContext';
