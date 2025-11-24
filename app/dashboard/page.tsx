@@ -130,7 +130,6 @@ export default function DashboardPage() {
             emails={emails} 
             loading={loading} 
             accessToken={accessToken} 
-            unreadCount={unreadCount} 
             onRefresh={loadData}
           />
         </div>
