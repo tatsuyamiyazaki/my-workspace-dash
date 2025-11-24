@@ -307,3 +307,22 @@ export const archiveEmail = async (accessToken: string, messageId: string): Prom
     throw new Error(`Failed to archive email: ${res.status} ${errorBody}`);
   }
 };
+
+/**
+ * メールをゴミ箱に移動する関数
+ * @param accessToken アクセストークン
+ * @param messageId メッセージID
+ */
+export const trashEmail = async (accessToken: string, messageId: string): Promise<void> => {
+  const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/trash`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`Failed to trash email: ${res.status} ${errorBody}`);
+  }
+};

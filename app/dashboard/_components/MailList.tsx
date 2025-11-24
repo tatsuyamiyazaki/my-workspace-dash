@@ -1,8 +1,8 @@
-import { EmailMessage, fetchThread, markAsRead, archiveEmail } from '@/lib/gmailApi';
+import { EmailMessage, fetchThread, markAsRead, archiveEmail, trashEmail } from '@/lib/gmailApi';
 import { format, isToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { useState, useEffect } from 'react';
-import { X, Reply, ExternalLink, User, Clock, Archive, Mail, MailOpen } from 'lucide-react';
+import { X, Reply, ExternalLink, User, Clock, Archive, Mail, MailOpen, Trash2, Maximize2, Minimize2 } from 'lucide-react';
 
 interface MailListProps {
   emails: EmailMessage[];
@@ -16,18 +16,25 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
   const [currentThreadIndex, setCurrentThreadIndex] = useState(0);
   const [loadingThread, setLoadingThread] = useState(false);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [isMaximized, setIsMaximized] = useState(false);
 
   // Escキー対応
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && selectedThread) {
         setSelectedThread(null);
+        setIsMaximized(false);
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedThread]);
+
+  const closeModal = () => {
+    setSelectedThread(null);
+    setIsMaximized(false);
+  };
 
   const handleEmailClick = async (email: EmailMessage) => {
     if (!accessToken) return;
@@ -57,12 +64,25 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
     if (!accessToken) return;
     try {
       await archiveEmail(accessToken, email.id);
-      setSelectedThread(null); // Close the modal after successful archive
+      closeModal();
       if (onRefresh) {
         onRefresh();
       }
     } catch (error: unknown) {
-      console.error("Failed to archive email:", error); // Log the error instead of alerting
+      console.error("Failed to archive email:", error);
+    }
+  };
+
+  const handleDelete = async (email: EmailMessage) => {
+    if (!accessToken) return;
+    try {
+      await trashEmail(accessToken, email.id);
+      closeModal();
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (error: unknown) {
+      console.error("Failed to delete email:", error);
     }
   };
 
@@ -187,7 +207,9 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
       {/* Thread Detail Modal */}
       {(selectedThread || loadingThread) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-[#1e293b] rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-700">
+          <div className={`bg-[#1e293b] rounded-xl shadow-2xl w-full flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-700 transition-all ${
+            isMaximized ? 'max-w-none max-h-none h-full m-0' : 'max-w-3xl max-h-[85vh]'
+          }`}>
             
             {loadingThread ? (
               <div className="p-12 flex flex-col items-center justify-center text-white">
@@ -200,18 +222,27 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
                 <div className="p-6 border-b border-slate-700 flex items-start justify-between bg-[#1e293b]">
                   <div className="flex-1 min-w-0 mr-8">
                     <h3 className="text-xl font-bold text-white leading-snug">
-                      {currentMessage.headers.subject} 
+                      {currentMessage.headers.subject}
                       {selectedThread!.length > 1 && (
                         <span className="ml-3 text-base font-normal text-slate-400">({selectedThread!.length}件)</span>
                       )}
                     </h3>
                   </div>
-                  <button 
-                    onClick={() => setSelectedThread(null)}
-                    className="text-slate-400 hover:text-white transition-colors"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setIsMaximized(!isMaximized)}
+                      className="text-slate-400 hover:text-white transition-colors"
+                      title={isMaximized ? '元のサイズに戻す' : '最大化'}
+                    >
+                      {isMaximized ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
+                    </button>
+                    <button
+                      onClick={closeModal}
+                      className="text-slate-400 hover:text-white transition-colors"
+                    >
+                      <X className="w-6 h-6" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Action Bar */}
@@ -233,6 +264,13 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
                   >
                     <Archive className="w-4 h-4" />
                     アーカイブ
+                  </button>
+                  <button
+                    onClick={() => handleDelete(currentMessage)}
+                    className="flex items-center gap-2 px-4 py-1.5 bg-red-100 text-red-700 text-sm font-bold rounded-lg hover:bg-red-200 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    削除
                   </button>
                 </div>
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, X, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Plus, Maximize2, Minimize2 } from 'lucide-react';
 import { 
   format, 
   addMonths, 
@@ -60,6 +60,7 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedDateEvents, setSelectedDateEvents] = useState<{ date: Date, events: CalendarEvent[] } | null>(null);
+  const [isModalMaximized, setIsModalMaximized] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [hoveredSlot, setHoveredSlot] = useState<{ date: Date, top: number } | null>(null);
   const [dragSelection, setDragSelection] = useState<{ date: Date, startY: number, currentY: number } | null>(null);
@@ -129,6 +130,7 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
         // 日付イベント詳細モーダルが開いている場合は閉じる
         else if (selectedDateEvents) {
           setSelectedDateEvents(null);
+          setIsModalMaximized(false);
         }
       }
     };
@@ -136,6 +138,11 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [editingEvent, selectedDateEvents]);
+
+  const closeEventsModal = () => {
+    setSelectedDateEvents(null);
+    setIsModalMaximized(false);
+  };
 
   const handleEventClick = async (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -597,24 +604,35 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
       {/* Day Events Modal (for Month View) */}
       {selectedDateEvents && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col h-[70vh]">
+          <div className={`bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col transition-all ${
+            isModalMaximized ? 'max-w-none max-h-none h-full m-0' : 'max-w-md h-[70vh]'
+          }`}>
             <div className="p-4 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between bg-gray-50 dark:bg-slate-900/50 flex-shrink-0">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white">
                 {format(selectedDateEvents.date, 'yyyy年MM月dd日', { locale: ja })} の予定
               </h3>
-              <button 
-                onClick={() => setSelectedDateEvents(null)}
-                className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setIsModalMaximized(!isModalMaximized)}
+                  className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full transition-colors"
+                  title={isModalMaximized ? '元のサイズに戻す' : '最大化'}
+                >
+                  {isModalMaximized ? <Minimize2 className="w-5 h-5 text-gray-500 dark:text-gray-400" /> : <Maximize2 className="w-5 h-5 text-gray-500 dark:text-gray-400" />}
+                </button>
+                <button
+                  onClick={closeEventsModal}
+                  className="p-2 hover:bg-gray-200 dark:hover:bg-slate-700 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-500 dark:text-gray-400" />
+                </button>
+              </div>
             </div>
             <div className="flex-1 min-h-0">
               {renderTimelineView([selectedDateEvents.date], false)}
             </div>
             <div className="p-3 border-t border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 flex justify-end flex-shrink-0">
               <button
-                onClick={() => setSelectedDateEvents(null)}
+                onClick={closeEventsModal}
                 className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-slate-700 rounded-lg transition-colors"
               >
                 閉じる
