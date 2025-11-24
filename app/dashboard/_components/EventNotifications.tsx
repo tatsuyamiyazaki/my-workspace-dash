@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef } from 'react';
 import { CalendarEvent, fetchEvents } from '@/lib/calendarApi';
 import { useSettings } from '@/contexts/AuthContext';
@@ -13,6 +11,21 @@ export default function EventNotifications({ accessToken }: EventNotificationsPr
   const { notificationMinutes, notificationsEnabled } = useSettings();
   const notifiedEventsRef = useRef<Set<string>>(new Set());
   const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showNotification = (event: CalendarEvent, minutesBefore: number) => {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      const startTime = event.start.dateTime ? parseISO(event.start.dateTime) : null;
+      const timeStr = startTime ? startTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
+
+      new Notification(`📅 ${minutesBefore}分後に予定があります`, {
+        body: `${event.summary}\n${timeStr}`,
+        icon: '/favicon.ico',
+        tag: `event-${event.id}-${minutesBefore}`,
+        requireInteraction: false,
+        silent: false,
+      });
+    }
+  };
 
   useEffect(() => {
     if (!accessToken || !notificationsEnabled) {
@@ -76,21 +89,6 @@ export default function EventNotifications({ accessToken }: EventNotificationsPr
       }
     };
   }, [accessToken, notificationsEnabled, notificationMinutes]);
-
-  const showNotification = (event: CalendarEvent, minutesBefore: number) => {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      const startTime = event.start.dateTime ? parseISO(event.start.dateTime) : null;
-      const timeStr = startTime ? startTime.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
-
-      new Notification(`📅 ${minutesBefore}分後に予定があります`, {
-        body: `${event.summary}\n${timeStr}`,
-        icon: '/favicon.ico',
-        tag: `event-${event.id}-${minutesBefore}`,
-        requireInteraction: false,
-        silent: false,
-      });
-    }
-  };
 
   return null; // This component doesn't render anything
 }

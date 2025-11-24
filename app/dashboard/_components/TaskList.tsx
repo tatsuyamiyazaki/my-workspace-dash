@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Check, Loader2, Plus, X, Trash2, Filter } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Loader2, Plus, X, Trash2, Filter } from 'lucide-react';
 import { fetchTasks, fetchTaskLists, createTask, updateTask, deleteTask, Task, TaskList as ITaskList } from '@/lib/tasksApi';
 import { useAuth } from '@/contexts/AuthContext';
 import { isToday, parseISO } from 'date-fns';
@@ -18,7 +18,7 @@ export default function TaskList({ accessToken, refreshTrigger }: TaskListProps)
   const [isSaving, setIsSaving] = useState(false);
   const [showTodayOnly, setShowTodayOnly] = useState(false);
 
-  const loadTasks = async () => {
+  const loadTasks = useCallback(async () => {
     if (!accessToken) return;
     
     try {
@@ -44,19 +44,19 @@ export default function TaskList({ accessToken, refreshTrigger }: TaskListProps)
       });
 
       setTasks(allTasks);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to fetch tasks", error);
-      if (error.message?.includes('401')) {
+      if (error instanceof Error && error.message?.includes('401')) {
         setAccessToken(null);
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, setAccessToken]);
 
   useEffect(() => {
     loadTasks();
-  }, [accessToken, refreshTrigger]);
+  }, [loadTasks, refreshTrigger]);
 
   const handleCreateClick = () => {
     setEditingTask({
@@ -84,7 +84,8 @@ export default function TaskList({ accessToken, refreshTrigger }: TaskListProps)
         if (editingTask.originalTaskListId && editingTask.originalTaskListId !== targetListId) {
             // List changed: Delete from old list, Create in new list
             await deleteTask(accessToken, editingTask.originalTaskListId, editingTask.id);
-            const { id, originalTaskListId, ...taskData } = editingTask; // Remove ID to create new
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            const { id: _id, originalTaskListId: _originalTaskListId, ...taskData } = editingTask; // Remove ID to create new
             await createTask(accessToken, targetListId, taskData);
         } else {
             // Normal update

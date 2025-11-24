@@ -72,7 +72,16 @@ export const getEvent = async (accessToken: string, eventId: string): Promise<Ca
 };
 
 export const createEvent = async (accessToken: string, event: Partial<CalendarEvent>) => {
-  const body: any = {
+  interface CreateEventBody {
+    summary?: string;
+    description?: string;
+    start?: { dateTime?: string; date?: string; };
+    end?: { dateTime?: string; date?: string; };
+    recurrence?: string[];
+    colorId?: string;
+  }
+
+  const body: CreateEventBody = {
     summary: event.summary,
     description: event.description,
     start: event.start,
@@ -121,8 +130,17 @@ export const deleteEvent = async (accessToken: string, eventId: string) => {
 };
 
 export const updateEvent = async (accessToken: string, eventId: string, event: Partial<CalendarEvent>) => {
+  interface UpdateEventBody {
+    summary?: string;
+    description?: string;
+    colorId?: string;
+    recurrence?: string[];
+    start?: { dateTime?: string; date?: string; };
+    end?: { dateTime?: string; date?: string; };
+  }
+
   // API expects specific format for updates, ensure we only send what's needed
-  const body: any = {
+  const body: UpdateEventBody = {
     summary: event.summary,
     description: event.description,
     colorId: event.colorId,

@@ -4,10 +4,12 @@ import SummaryCards from './_components/SummaryCards';
 import CalendarView from './_components/CalendarView';
 import MailList from './_components/MailList';
 import TaskList from './_components/TaskList';
-import LinkList from './_components/LinkList';
+import FixedLinkList from './_components/FixedLinkList'; // New import
+import CustomLinkList from './_components/CustomLinkList'; // Renamed import
+import NotesWidget from './_components/NotesWidget';
 import EventNotifications from './_components/EventNotifications';
 import { useAuth, useSettings } from '@/contexts/AuthContext';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { fetchInboxEmails, EmailMessage } from '@/lib/gmailApi';
 import { fetchDashboardCalendarData, CalendarEvent } from '@/lib/calendarApi';
 import { useRouter } from 'next/navigation';
@@ -25,7 +27,7 @@ export default function DashboardPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     if (!accessToken) return;
     
     try {
@@ -44,19 +46,19 @@ export default function DashboardPage() {
       setTodayEventCount(calendarData.todayEventCount);
       setNextEvent(calendarData.nextEvent);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to fetch dashboard data", error);
-      if (error.message && error.message.includes('401')) {
+      if (error instanceof Error && error.message && error.message.includes('401')) {
         setAccessToken(null);
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, setAccessToken]);
 
   useEffect(() => {
     loadData();
-  }, [accessToken]);
+  }, [loadData]);
 
   // Auto-refresh based on settings
   useEffect(() => {
@@ -84,7 +86,7 @@ export default function DashboardPage() {
     if (refreshKey > 0) {
       loadData();
     }
-  }, [refreshKey]);
+  }, [refreshKey, loadData]);
 
   if (!accessToken) {
     return (
@@ -144,9 +146,14 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Bottom Section: Links */}
-      <LinkList />
+      {/* Fixed Links Section */}
+      <FixedLinkList />
+
+      {/* Custom Links and Notes Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <CustomLinkList />
+        <NotesWidget />
+      </div>
     </div>
   );
 }
-

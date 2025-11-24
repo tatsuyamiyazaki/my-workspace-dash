@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { ChevronLeft, ChevronRight, X, Clock, Calendar as CalendarIcon, Plus } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { ChevronLeft, ChevronRight, X, Plus } from 'lucide-react';
 import { 
   format, 
   addMonths, 
@@ -67,27 +67,8 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
   const [isSaving, setIsSaving] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
 
-  // Update current time every minute
-  useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Scroll to current time when viewMode is week or day
-  useEffect(() => {
-    if (timelineRef.current && (viewMode === 'week' || viewMode === 'day')) {
-      const currentHour = now.getHours();
-      const scrollPosition = (currentHour - 1) * 60; // Scroll to one hour before current hour
-      timelineRef.current.scrollTop = scrollPosition;
-    }
-  }, [viewMode, now]);
-
-  // Fetch events when date or view mode changes
-  useEffect(() => {
-    loadEvents();
-  }, [currentDate, viewMode, accessToken, refreshTrigger]);
-
-  const loadEvents = async () => {
+  // loadEventsをuseCallbackでメモ化する
+  const loadEvents = useCallback(async () => {
     if (!accessToken) return;
 
     let start: Date, end: Date;
@@ -107,16 +88,35 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
       setLoading(true);
       const fetchedEvents = await fetchEvents(accessToken, start, end);
       setEvents(fetchedEvents);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to fetch calendar events", error);
-      if (error.message.includes('401')) {
+      if (error instanceof Error && error.message.includes('401')) {
         setAccessToken(null); // Token expired, force re-login
       }
     } finally {
       setLoading(false);
     }
-  };
+  }, [accessToken, currentDate, viewMode, setAccessToken]);
 
+  // Update current time every minute
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Scroll to current time when viewMode is week or day
+  useEffect(() => {
+    if (timelineRef.current && (viewMode === 'week' || viewMode === 'day')) {
+      const currentHour = now.getHours();
+      const scrollPosition = (currentHour - 1) * 60; // Scroll to one hour before current hour
+      timelineRef.current.scrollTop = scrollPosition;
+    }
+  }, [viewMode, now]);
+
+  // Fetch events when date or view mode changes
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents, refreshTrigger]);
   const handleEventClick = async (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingEvent(event);
@@ -473,7 +473,7 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
                     {isTodayNow && (
                       <div 
                         className="absolute w-full border-t-2 border-red-500 z-20 pointer-events-none"
-                        style={{ top: `${((now.getHours() * 60 + now.getMinutes()) / 60) * 60}px` }}
+                        style={{ top: `${((now.getHours() * 60 + now.getMinutes()) - 60)}px` }}
                       >
                         <div className="absolute -left-1.5 -top-1.5 w-3 h-3 bg-red-500 rounded-full"></div>
                       </div>

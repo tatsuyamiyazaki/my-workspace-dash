@@ -1,3 +1,44 @@
+// Gmail APIのレスポンスに対応する型定義
+interface GmailMessageHeader {
+  name: string;
+  value: string;
+}
+
+interface GmailMessagePartBody {
+  attachmentId?: string;
+  size: number;
+  data?: string;
+}
+
+interface GmailMessagePart {
+  partId: string;
+  mimeType: string;
+  filename: string;
+  headers?: GmailMessageHeader[];
+  body: GmailMessagePartBody;
+  parts?: GmailMessagePart[]; // ネストされたパート
+}
+
+interface GmailMessagePayload {
+  partId: string;
+  mimeType: string;
+  filename: string;
+  headers: GmailMessageHeader[];
+  body: GmailMessagePartBody;
+  parts?: GmailMessagePart[];
+}
+
+interface GmailRawMessage {
+  id: string;
+  threadId: string;
+  labelIds: string[];
+  snippet: string;
+  payload: GmailMessagePayload;
+  sizeEstimate: number;
+  historyId: string;
+  internalDate: string;
+}
+
 // メール1件分の型定義
 export interface EmailMessage {
   id: string;
@@ -28,19 +69,19 @@ const decodeBase64 = (data: string) => {
 };
 
 // ペイロードから本文を抽出する関数
-const extractBody = (payload: any): string => {
+const extractBody = (payload: GmailMessagePayload): string => {
   let encodedBody = '';
   
   if (payload.body && payload.body.data) {
     encodedBody = payload.body.data;
   } else if (payload.parts) {
     // text/html を優先して探す
-    const htmlPart = payload.parts.find((p: any) => p.mimeType === 'text/html');
+    const htmlPart = payload.parts.find((p: GmailMessagePart) => p.mimeType === 'text/html');
     if (htmlPart && htmlPart.body && htmlPart.body.data) {
       encodedBody = htmlPart.body.data;
     } else {
       // なければ text/plain を探す
-      const textPart = payload.parts.find((p: any) => p.mimeType === 'text/plain');
+      const textPart = payload.parts.find((p: GmailMessagePart) => p.mimeType === 'text/plain');
       if (textPart && textPart.body && textPart.body.data) {
         encodedBody = textPart.body.data;
       } else {
@@ -55,9 +96,9 @@ const extractBody = (payload: any): string => {
 };
 
 // Helper to format a single message
-const formatEmailMessage = (email: any): EmailMessage => {
+const formatEmailMessage = (email: GmailRawMessage): EmailMessage => {
   const headers = email.payload.headers;
-  const getHeader = (name: string) => headers.find((h: any) => h.name === name)?.value || "";
+  const getHeader = (name: string) => headers.find((h: GmailMessageHeader) => h.name === name)?.value || "";
   
   return {
     id: email.id,
@@ -108,13 +149,13 @@ export const fetchInboxEmails = async (accessToken: string, maxResults = 20): Pr
     return res.json();
   });
 
-  const rawDetails = await Promise.all(detailPromises);
+  const rawDetails: GmailRawMessage[] = await Promise.all(detailPromises);
 
   // 3. 使いやすい形に整形する
   const formattedEmails = rawDetails.map(formatEmailMessage);
   
   // 4. 未読数をカウント
-  const unreadCount = rawDetails.filter((email: any) => 
+  const unreadCount = rawDetails.filter((email: GmailRawMessage) => 
     email.labelIds && email.labelIds.includes('UNREAD')
   ).length;
 
@@ -161,7 +202,7 @@ export const fetchUnreadEmails = async (accessToken: string, maxResults = 10): P
     return res.json();
   });
 
-  const rawDetails = await Promise.all(detailPromises);
+  const rawDetails: GmailRawMessage[] = await Promise.all(detailPromises);
 
   // 3. 整形
   const formattedEmails = rawDetails.map(formatEmailMessage);

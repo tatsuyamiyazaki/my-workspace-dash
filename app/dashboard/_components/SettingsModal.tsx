@@ -23,18 +23,23 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     fixedLinks,
     setFixedLinks,
   } = useSettings();
-  const [tempInterval, setTempInterval] = useState(refreshInterval);
-  const [tempNotifications, setTempNotifications] = useState<number[]>(notificationMinutes);
-  const [tempEnabled, setTempEnabled] = useState(notificationsEnabled);
+  const [tempInterval, setTempInterval] = useState(() => refreshInterval);
+  const [tempNotifications, setTempNotifications] = useState<number[]>(() => notificationMinutes);
+  const [tempEnabled, setTempEnabled] = useState(() => notificationsEnabled);
   const [newNotificationTime, setNewNotificationTime] = useState<number>(5);
-  const [tempFixedLinks, setTempFixedLinks] = useState<FixedLink[]>(fixedLinks);
+  const [tempFixedLinks, setTempFixedLinks] = useState<FixedLink[]>(() => fixedLinks);
   const [editingLink, setEditingLink] = useState<FixedLink | null>(null);
 
   useEffect(() => {
-    setTempInterval(refreshInterval);
-    setTempNotifications(notificationMinutes);
-    setTempEnabled(notificationsEnabled);
-    setTempFixedLinks(fixedLinks);
+    if (isOpen) {
+      // Defer state updates to avoid synchronous setState in effect
+      setTimeout(() => {
+        setTempInterval(refreshInterval);
+        setTempNotifications(notificationMinutes);
+        setTempEnabled(notificationsEnabled);
+        setTempFixedLinks(fixedLinks);
+      }, 0);
+    }
   }, [refreshInterval, notificationMinutes, notificationsEnabled, fixedLinks, isOpen]);
 
   const handleSave = async () => {

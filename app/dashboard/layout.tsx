@@ -4,14 +4,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { LayoutGrid, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import Image from 'next/image'; // Import Image component
 import { ThemeToggle } from '@/components/ThemeToggle';
 import SettingsModal from './_components/SettingsModal';
 
 function CurrentDateTime() {
-  const [date, setDate] = useState<Date | null>(null);
+  const [date, setDate] = useState<Date>(() => new Date());
 
   useEffect(() => {
-    setDate(new Date());
     const timer = setInterval(() => setDate(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
@@ -47,7 +47,10 @@ export default function DashboardLayout({
 
   if (!user) {
     return null;
-  }
+  };
+  
+  const userPhotoUrl = user.photoURL || '';
+  const userDisplayName = user.displayName || 'User';
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] text-gray-900 dark:text-white">
@@ -71,15 +74,21 @@ export default function DashboardLayout({
           <CurrentDateTime />
           <div className="flex items-center gap-3 pl-4 border-l border-gray-200 dark:border-slate-700">
             <div className="text-right hidden sm:block">
-              <p className="text-sm font-medium leading-none">{user.displayName || 'User'}</p>
+              <p className="text-sm font-medium leading-none">{userDisplayName}</p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{user.email}</p>
             </div>
             <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-slate-700 overflow-hidden">
               {user.photoURL ? (
-                <img src={user.photoURL} alt={user.displayName || 'User'} className="w-full h-full object-cover" />
+                <Image 
+                  src={userPhotoUrl}
+                  alt={userDisplayName}
+                  width={40}
+                  height={40}
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-400 font-bold">
-                  {user.displayName?.[0] || 'U'}
+                  {userDisplayName[0]}
                 </div>
               )}
             </div>

@@ -1,10 +1,9 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
 import { User, onAuthStateChanged } from 'firebase/auth';
-import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
-import { useRouter } from 'next/navigation';
 
 interface AuthContextType {
   user: User | null;
@@ -24,7 +23,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -109,7 +107,57 @@ const SettingsContext = createContext<SettingsContextType>({
 export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
 
-  // Stateの初期値
+  // ローカルストレージからFirestoreへの移行関数
+  const migrateLocalToFirestore = useCallback(async (uid: string) => {
+    const localInterval = localStorage.getItem('dashboardRefreshInterval');
+    const localNotifTime = localStorage.getItem('notificationMinutes');
+    const localNotifEnabled = localStorage.getItem('notificationsEnabled');
+    const localFixed = localStorage.getItem('fixedLinks');
+    const localCustom = localStorage.getItem('customLinks');
+    const localFolders = localStorage.getItem('linkFolders');
+
+    const initialData = {
+      settings: {
+        refreshInterval: localInterval ? parseInt(localInterval) : 1,
+        notificationMinutes: localNotifTime ? JSON.parse(localNotifTime) : [5, 15],
+        notificationsEnabled: localNotifEnabled === 'true',
+        fixedLinks: localFixed ? JSON.parse(localFixed) : DEFAULT_FIXED_LINKS,
+      },
+      customLinks: localCustom ? JSON.parse(localCustom) : [],
+      folders: localFolders ? JSON.parse(localFolders) : [],
+    };
+
+    // Firestoreに保存
+    await setDoc(doc(db, "users", uid), initialData, { merge: true });
+    
+    // オプション: 移行後にローカルストレージをクリアするならここで実行
+    // localStorage.clear();
+  }, []);
+
+  // Filrestoreへの保存ヘルパー関数
+  const saveToFirestore = useCallback(async (key: string, value: unknown) => {
+    if (!user) return;
+    const userDocRef = doc(db, 'users', user.uid);
+
+    // setting配下のデータか、ルート直下のデータ (customLinks or folders) かで分岐
+    if (['refreshInterval', 'notificationMinutes', 'notificationsEnabled', 'fixedLinks'].includes(key)) {
+      // Type guard for settings properties
+      if (key === 'refreshInterval' && typeof value !== 'number') return;
+      if (key === 'notificationMinutes' && (!Array.isArray(value) || !value.every(item => typeof item === 'number'))) return;
+      if (key === 'notificationsEnabled' && typeof value !== 'boolean') return;
+      if (key === 'fixedLinks' && (!Array.isArray(value) || !value.every((item: FixedLink) => typeof item === 'object' && 'id' in item && 'name' in item && 'url' in item && 'icon' in item))) return;
+
+      await setDoc(userDocRef, { settings: { [key]: value } }, { merge: true });
+    } else {
+      // Type guard for root properties
+      if (key === 'customLinks' && (!Array.isArray(value) || !value.every((item: CustomLink) => typeof item === 'object' && 'id' in item && 'name' in item && 'url' in item && 'icon' in item))) return;
+      if (key === 'folders' && (!Array.isArray(value) || !value.every((item: LinkFolder) => typeof item === 'object' && 'id' in item && 'name' in item && 'icon' in item))) return;
+
+      await setDoc(userDocRef, { [key]: value }, { merge: true });
+    }
+  }, [user]);
+
+  // Setter関数のラッパ (State更新 + Firestore保存)
   const [refreshInterval, setRefreshIntervalState] = useState(1);
   const [notificationMinutes, setNotificationMinutesState] = useState<number[]>([5, 15]);
   const [notificationsEnabled, setNotificationsEnabledState] = useState(false);
@@ -143,49 +191,9 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => unsubscribe();
-  }, [user]);
+  }, [user, migrateLocalToFirestore]);
 
-  // ローカルストレージからFirestoreへの移行関数
-  const migrateLocalToFirestore = async (uid: string) => {
-    const localInterval = localStorage.getItem('dashboardRefreshInterval');
-    const localNotifTime = localStorage.getItem('notificationMinutes');
-    const localNotifEnabled = localStorage.getItem('notificationsEnabled');
-    const localFixed = localStorage.getItem('fixedLinks');
-    const localCustom = localStorage.getItem('customLinks');
-    const localFolders = localStorage.getItem('linkFolders');
-
-    const initialData = {
-      settings: {
-        refreshInterval: localInterval ? parseInt(localInterval) : 1,
-        notificationMinutes: localNotifTime ? JSON.parse(localNotifTime) : [5, 15],
-        notificationsEnabled: localNotifEnabled === 'true',
-        fixedLinks: localFixed ? JSON.parse(localFixed) : DEFAULT_FIXED_LINKS,
-      },
-      customLinks: localCustom ? JSON.parse(localCustom) : [],
-      folders: localFolders ? JSON.parse(localFolders) : [],
-    };
-
-    // Firestoreに保存
-    await setDoc(doc(db, "users", uid), initialData, { merge: true });
-    
-    // オプション: 移行後にローカルストレージをクリアするならここで実行
-    // localStorage.clear();
-  };
-
-  // Filrestoreへの保存ヘルパー関数
-  const saveToFirestore = async (key: string, value: any) => {
-    if (!user) return;
-    const userDocRef = doc(db, 'users', user.uid);
-
-    // setting配下のデータか、ルート直下のデータ (customLinks or folders) かで分岐
-    if (['refreshInterval', 'notificationMinutes', 'notificationsEnabled', 'fixedLinks'].includes(key)) {
-      await setDoc(userDocRef, { settings: { [key]: value } }, { merge: true });
-    } else{
-      await setDoc(userDocRef, { [key]: value }, { merge: true });
-    }
-  };
-
-  // Setter関数のラッパ (State更新 + Firestore保存)
+  // Setter functions wrappers
   const setRefreshInterval = (val: number) => {
     setRefreshIntervalState(val);
     saveToFirestore('refreshInterval', val);
@@ -226,3 +234,4 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
 };
 
 export const useSettings = () => useContext(SettingsContext);
+

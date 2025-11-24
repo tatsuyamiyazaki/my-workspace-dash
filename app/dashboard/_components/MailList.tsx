@@ -8,11 +8,10 @@ interface MailListProps {
   emails: EmailMessage[];
   loading?: boolean;
   accessToken?: string | null;
-  unreadCount?: number;
   onRefresh?: () => void;
 }
 
-export default function MailList({ emails, loading = false, accessToken, unreadCount = 0, onRefresh }: MailListProps) {
+export default function MailList({ emails, loading = false, accessToken, onRefresh }: MailListProps) {
   const [selectedThread, setSelectedThread] = useState<EmailMessage[] | null>(null);
   const [currentThreadIndex, setCurrentThreadIndex] = useState(0);
   const [loadingThread, setLoadingThread] = useState(false);
@@ -50,8 +49,9 @@ export default function MailList({ emails, loading = false, accessToken, unreadC
       if (onRefresh) {
         onRefresh();
       }
-    } catch (e) {
-      console.error("Failed to archive email:", e); // Log the error instead of alerting
+    } catch (_error) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      console.error("Failed to archive email:", _error); // Log the error instead of alerting
     }
   };
 
@@ -77,7 +77,8 @@ export default function MailList({ emails, loading = false, accessToken, unreadC
         return format(date, 'HH:mm', { locale: ja });
       }
       return format(date, 'MM月dd日', { locale: ja });
-    } catch (e) {
+    } catch (_error) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       return dateStr;
     }
   };
@@ -85,7 +86,8 @@ export default function MailList({ emails, loading = false, accessToken, unreadC
   const formatFullDate = (dateStr: string) => {
     try {
       return format(new Date(dateStr), 'yyyy年MM月dd日 HH:mm', { locale: ja });
-    } catch (e) {
+    } catch (_error) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       return dateStr;
     }
   };

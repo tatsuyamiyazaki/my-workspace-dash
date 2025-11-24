@@ -3,14 +3,13 @@
 import { useState } from 'react';
 import { 
   Folder, ChevronRight, Plus, X, Trash2, Edit2,
-  ChevronDown, FolderPlus
+  ChevronDown, FolderPlus, ExternalLink
 } from 'lucide-react';
 import { ICON_OPTIONS } from '@/lib/constants';
 import { useSettings, CustomLink, LinkFolder } from '@/contexts/AuthContext';
 
-export default function LinkList() {
+export default function CustomLinkList() {
   const { 
-    fixedLinks,
     customLinks, setCustomLinks,
     folders, setFolders
    } = useSettings();
@@ -113,170 +112,140 @@ export default function LinkList() {
 
   const getIconComponent = (iconName: string) => {
     const icon = ICON_OPTIONS.find(opt => opt.name === iconName);
-    return icon ? icon.component : Folder;
+    return icon ? icon.component : ExternalLink;
   };
 
   const unorganizedLinks = customLinks.filter(link => !link.folderId);
 
   return (
-    <>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Fixed Links */}
-        <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-full">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">固定リンク集</h2>
-          <div className="space-y-4">
-            {fixedLinks.map((link) => {
-              const LinkIcon = getIconComponent(link.icon);
+    <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-full">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white">カスタムリンク集</h2>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={handleCreateFolderClick}
+            className="p-1 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
+            title="フォルダを作成"
+          >
+            <FolderPlus className="w-5 h-5" />
+          </button>
+          <button 
+            onClick={() => handleCreateLinkClick()}
+            className="p-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
+            title="リンクを作成"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+      <div className="space-y-3 overflow-y-auto max-h-[400px]">
+        {folders.length === 0 && customLinks.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+            カスタムリンクはありません
+          </div>
+        ) : (
+          <>
+            {/* Folders */}
+            {folders.map((folder) => {
+              const folderLinks = customLinks.filter(link => link.folderId === folder.id);
               return (
-                <a 
-                  key={link.id}
-                  href={link.url} 
-                  target="_blank" 
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                >
-                  <div className="text-blue-500">
-                    <LinkIcon className="w-5 h-5" />
+                <div key={folder.id} className="space-y-2">
+                  <div className="flex items-center justify-between group">
+                    <button
+                      onClick={() => toggleFolder(folder.id)}
+                      className="flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex-1 text-left"
+                    >
+                      <div className="text-blue-500">
+                        {folder.isExpanded ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                      </div>
+                      <Folder className="w-5 h-5 text-yellow-500" />
+                      <span className="text-sm font-semibold">{folder.name}</span>
+                      <span className="text-xs text-gray-400">({folderLinks.length})</span>
+                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleCreateLinkClick(folder.id)}
+                        className="p-1 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
+                        title="リンクを追加"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={(e) => handleEditFolderClick(folder, e)}
+                        className="p-1 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
+                        title="フォルダを編集"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
-                  <span className="text-sm font-medium">{link.name}</span>
-                </a>
+                  {folder.isExpanded && (
+                    <div className="ml-6 border-l-2 border-gray-200 dark:border-slate-700 pl-3 grid grid-cols-2 gap-2">
+                      {folderLinks.length === 0 ? (
+                        <div className="text-xs text-gray-400 py-2 col-span-2">リンクはありません</div>
+                      ) : (
+                        folderLinks.map((link) => {
+                          const LinkIcon = getIconComponent(link.icon);
+                          return (
+                            <div key={link.id} className="flex items-center justify-between group/link">
+                              <a 
+                                href={link.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex-1"
+                              >
+                                <LinkIcon className="w-4 h-4 text-blue-500" />
+                                <span className="text-sm">{link.name}</span>
+                              </a>
+                              <button
+                                onClick={(e) => handleEditLinkClick(link, e)}
+                                className="p-1 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors opacity-0 group-hover/link:opacity-100"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
               );
             })}
-          </div>
-        </div>
 
-        {/* Custom Links */}
-        <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-full">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">カスタムリンク集</h2>
-            <div className="flex items-center gap-2">
-              <button 
-                onClick={handleCreateFolderClick}
-                className="p-1 bg-gray-50 dark:bg-slate-800 text-gray-600 dark:text-gray-400 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
-                title="フォルダを作成"
-              >
-                <FolderPlus className="w-5 h-5" />
-              </button>
-              <button 
-                onClick={() => handleCreateLinkClick()}
-                className="p-1 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-full hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors"
-                title="リンクを作成"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-          <div className="space-y-3 overflow-y-auto max-h-[400px]">
-            {folders.length === 0 && customLinks.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-                カスタムリンクはありません
-              </div>
-            ) : (
-              <>
-                {/* Folders */}
-                {folders.map((folder) => {
-                  const FolderIcon = getIconComponent(folder.icon);
-                  const folderLinks = customLinks.filter(link => link.folderId === folder.id);
+            {/* Unorganized Links */}
+            {unorganizedLinks.length > 0 && (
+              <div className="pt-2 border-t border-gray-200 dark:border-slate-700 grid grid-cols-2 gap-2">
+                {unorganizedLinks.map((link) => {
+                  const LinkIcon = getIconComponent(link.icon);
                   return (
-                    <div key={folder.id} className="space-y-2">
-                      <div className="flex items-center justify-between group">
-                        <button
-                          onClick={() => toggleFolder(folder.id)}
-                          className="flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex-1 text-left"
-                        >
-                          <div className="text-blue-500">
-                            {folder.isExpanded ? (
-                              <ChevronDown className="w-4 h-4" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4" />
-                            )}
-                          </div>
-                          <FolderIcon className="w-5 h-5 text-yellow-500" />
-                          <span className="text-sm font-semibold">{folder.name}</span>
-                          <span className="text-xs text-gray-400">({folderLinks.length})</span>
-                        </button>
-                        <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => handleCreateLinkClick(folder.id)}
-                            className="p-1 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
-                            title="リンクを追加"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => handleEditFolderClick(folder, e)}
-                            className="p-1 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
-                            title="フォルダを編集"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                      {folder.isExpanded && (
-                        <div className="ml-6 border-l-2 border-gray-200 dark:border-slate-700 pl-3 grid grid-cols-2 gap-2">
-                          {folderLinks.length === 0 ? (
-                            <div className="text-xs text-gray-400 py-2 col-span-2">リンクはありません</div>
-                          ) : (
-                            folderLinks.map((link) => {
-                              const LinkIcon = getIconComponent(link.icon);
-                              return (
-                                <div key={link.id} className="flex items-center justify-between group/link">
-                                  <a 
-                                    href={link.url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer"
-                                    className="flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex-1"
-                                  >
-                                    <LinkIcon className="w-4 h-4 text-blue-500" />
-                                    <span className="text-sm">{link.name}</span>
-                                  </a>
-                                  <button
-                                    onClick={(e) => handleEditLinkClick(link, e)}
-                                    className="p-1 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors opacity-0 group-hover/link:opacity-100"
-                                  >
-                                    <Edit2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              );
-                            })
-                          )}
-                        </div>
-                      )}
+                    <div key={link.id} className="flex items-center justify-between group">
+                      <a 
+                        href={link.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex-1"
+                      >
+                        <LinkIcon className="w-5 h-5 text-blue-500" />
+                        <span className="text-sm font-medium">{link.name}</span>
+                      </a>
+                      <button
+                        onClick={(e) => handleEditLinkClick(link, e)}
+                        className="p-1.5 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
                     </div>
                   );
                 })}
-
-                {/* Unorganized Links */}
-                {unorganizedLinks.length > 0 && (
-                  <div className="pt-2 border-t border-gray-200 dark:border-slate-700 grid grid-cols-2 gap-2">
-                    {unorganizedLinks.map((link) => {
-                      const LinkIcon = getIconComponent(link.icon);
-                      return (
-                        <div key={link.id} className="flex items-center justify-between group">
-                          <a 
-                            href={link.url} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-3 text-gray-700 dark:text-gray-200 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex-1"
-                          >
-                            <LinkIcon className="w-5 h-5 text-blue-500" />
-                            <span className="text-sm font-medium">{link.name}</span>
-                          </a>
-                          <button
-                            onClick={(e) => handleEditLinkClick(link, e)}
-                            className="p-1.5 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors opacity-0 group-hover:opacity-100"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
+              </div>
             )}
-          </div>
-        </div>
+          </>
+        )}
       </div>
 
       {/* Edit/Create Link Modal */}
@@ -498,6 +467,6 @@ export default function LinkList() {
           </div>
         </div>
       )}
-    </>
+    </div >
   );
 }
