@@ -49,9 +49,8 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
       if (onRefresh) {
         onRefresh();
       }
-    } catch (_error) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      console.error("Failed to archive email:", _error); // Log the error instead of alerting
+    } catch (error: unknown) {
+      console.error("Failed to archive email:", error); // Log the error instead of alerting
     }
   };
 
@@ -77,8 +76,7 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
         return format(date, 'HH:mm', { locale: ja });
       }
       return format(date, 'MM月dd日', { locale: ja });
-    } catch (_error) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch {
       return dateStr;
     }
   };
@@ -86,8 +84,7 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
   const formatFullDate = (dateStr: string) => {
     try {
       return format(new Date(dateStr), 'yyyy年MM月dd日 HH:mm', { locale: ja });
-    } catch (_error) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch {
       return dateStr;
     }
   };

@@ -1,12 +1,22 @@
 import { useState, useEffect } from 'react';
 import { Note } from '@/lib/constants';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, LayoutGrid, LayoutList } from 'lucide-react';
+
+type ViewMode = 'list' | 'grid';
 
 const NotesWidget = () => {
   const [notes, setNotes] = useState<Note[]>(() => {
     const storedNotes = localStorage.getItem('dashboardNotes');
     return storedNotes ? JSON.parse(storedNotes) : [];
   });
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    if (typeof window !== 'undefined') {
+      const storedMode = localStorage.getItem('notesViewMode');
+      return (storedMode === 'grid' || storedMode === 'list') ? storedMode : 'list';
+    }
+    return 'list';
+  });
+  
   const [newNoteContent, setNewNoteContent] = useState('');
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState('');
@@ -15,6 +25,11 @@ const NotesWidget = () => {
   useEffect(() => {
     localStorage.setItem('dashboardNotes', JSON.stringify(notes));
   }, [notes]);
+
+  // Save viewMode to local storage
+  useEffect(() => {
+    localStorage.setItem('notesViewMode', viewMode);
+  }, [viewMode]);
 
   const handleAddNote = () => {
     if (newNoteContent.trim()) {
@@ -52,7 +67,26 @@ const NotesWidget = () => {
 
   return (
     <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-full flex flex-col">
-      <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">メモ</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">メモ</h2>
+        <div className="flex bg-gray-100 dark:bg-slate-800 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`p-1.5 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+            title="リスト表示"
+          >
+            <LayoutList className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setViewMode('grid')}
+            className={`p-1.5 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'}`}
+            title="カード表示"
+          >
+            <LayoutGrid className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
       <div className="flex items-center gap-2 mb-4">
         <input
           type="text"
@@ -71,30 +105,37 @@ const NotesWidget = () => {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto space-y-3">
+      <div className={`flex-1 overflow-y-auto ${viewMode === 'grid' ? 'grid grid-cols-1 sm:grid-cols-4 gap-3' : 'space-y-3'}`}>
         {notes.length === 0 ? (
-          <p className="text-gray-500 dark:text-gray-400 text-sm">メモはありません。</p>
+          <div className="col-span-full text-center py-8">
+            <p className="text-gray-500 dark:text-gray-400 text-sm">メモはありません。</p>
+          </div>
         ) : (
           notes.map((note) => (
-            <div key={note.id} className="bg-gray-50 dark:bg-slate-700 p-3 rounded-lg shadow-sm flex flex-col group">
+            <div 
+              key={note.id} 
+              className={`
+                bg-gray-50 dark:bg-slate-700 p-3 rounded-lg shadow-sm flex flex-col group 
+                ${viewMode === 'grid' ? 'h-[150px]' : ''}
+              `}
+            >
               {editingNoteId === note.id ? (
-                <div className="flex flex-col space-y-2">
+                <div className="flex flex-col h-full space-y-2">
                   <textarea
                     value={editingNoteContent}
                     onChange={(e) => setEditingNoteContent(e.target.value)}
-                    className="w-full px-2 py-1 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none text-sm"
-                    rows={3}
+                    className="w-full flex-1 px-2 py-1 border border-gray-300 dark:border-slate-600 rounded-md bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500 outline-none text-sm resize-none"
                   />
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-2 pt-1">
                     <button
                       onClick={handleCancelEdit}
-                      className="px-3 py-1 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-md transition-colors"
+                      className="px-2 py-1 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-md transition-colors"
                     >
                       キャンセル
                     </button>
                     <button
                       onClick={() => handleSaveEdit(note.id)}
-                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                      className="px-2 py-1 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                     >
                       保存
                     </button>
@@ -102,21 +143,25 @@ const NotesWidget = () => {
                 </div>
               ) : (
                 <>
-                  <p className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap flex-1">{note.content}</p>
-                  <div className="flex justify-end gap-2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-slate-600">
+                    <p className="text-gray-800 dark:text-gray-200 text-sm whitespace-pre-wrap break-words">
+                      {note.content}
+                    </p>
+                  </div>
+                  <div className={`flex justify-end gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${viewMode === 'grid' ? 'pt-2 border-t border-gray-200 dark:border-slate-600' : ''}`}>
                     <button
                       onClick={() => handleEditNote(note)}
-                      className="p-1 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-full transition-colors"
+                      className="p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-full transition-colors"
                       title="編集"
                     >
-                      <Edit className="w-4 h-4" />
+                      <Edit className="w-3.5 h-3.5" />
                     </button>
                     <button
                       onClick={() => handleDeleteNote(note.id)}
-                      className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full transition-colors"
+                      className="p-1.5 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-full transition-colors"
                       title="削除"
                     >
-                      <Trash2 className="w-4 h-4" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </>

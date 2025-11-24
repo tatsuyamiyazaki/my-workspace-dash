@@ -33,42 +33,52 @@ export const fetchEvents = async (
     orderBy: 'startTime',
   });
 
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!res.ok) {
+      const errorBody = await res.text();
+      console.error(`Calendar API Error: ${res.status}`, errorBody);
+      throw new Error(`Failed to fetch calendar events: ${res.status}`);
     }
-  );
 
-  if (!res.ok) {
-    const errorBody = await res.text();
-    console.error(`Calendar API Error: ${res.status}`, errorBody);
-    throw new Error(`Failed to fetch calendar events: ${res.status}`);
+    const data = await res.json();
+    return data.items || [];
+  } catch (error: unknown) {
+    console.error('Error in fetchEvents:', error);
+    throw error instanceof Error ? error : new Error('Network error while fetching calendar events');
   }
-
-  const data = await res.json();
-  return data.items || [];
 };
 
 export const getEvent = async (accessToken: string, eventId: string): Promise<CalendarEvent> => {
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!res.ok) {
+      const errorBody = await res.text();
+      console.error(`Calendar API Get Error: ${res.status}`, errorBody);
+      throw new Error(`Failed to get event: ${res.status}`);
     }
-  );
 
-  if (!res.ok) {
-    const errorBody = await res.text();
-    console.error(`Calendar API Get Error: ${res.status}`, errorBody);
-    throw new Error(`Failed to get event: ${res.status}`);
+    return await res.json();
+  } catch (error: unknown) {
+    console.error('Error in getEvent:', error);
+    throw error instanceof Error ? error : new Error('Network error while getting event');
   }
-
-  return await res.json();
 };
 
 export const createEvent = async (accessToken: string, event: Partial<CalendarEvent>) => {
@@ -90,42 +100,52 @@ export const createEvent = async (accessToken: string, event: Partial<CalendarEv
     colorId: event.colorId,
   };
 
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!res.ok) {
+      const errorBody = await res.text();
+      console.error(`Calendar API Create Error: ${res.status}`, errorBody);
+      throw new Error(`Failed to create event: ${res.status}`);
     }
-  );
 
-  if (!res.ok) {
-    const errorBody = await res.text();
-    console.error(`Calendar API Create Error: ${res.status}`, errorBody);
-    throw new Error(`Failed to create event: ${res.status}`);
+    return await res.json();
+  } catch (error: unknown) {
+    console.error('Error in createEvent:', error);
+    throw error instanceof Error ? error : new Error('Network error while creating event');
   }
-
-  return await res.json();
 };
 
 export const deleteEvent = async (accessToken: string, eventId: string) => {
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
-    {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+      {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
 
-  if (!res.ok) {
-    const errorBody = await res.text();
-    console.error(`Calendar API Delete Error: ${res.status}`, errorBody);
-    throw new Error(`Failed to delete event: ${res.status}`);
+    if (!res.ok) {
+      const errorBody = await res.text();
+      console.error(`Calendar API Delete Error: ${res.status}`, errorBody);
+      throw new Error(`Failed to delete event: ${res.status}`);
+    }
+  } catch (error: unknown) {
+    console.error('Error in deleteEvent:', error);
+    throw error instanceof Error ? error : new Error('Network error while deleting event');
   }
 };
 
@@ -155,25 +175,30 @@ export const updateEvent = async (accessToken: string, eventId: string, event: P
   if (event.start) body.start = event.start;
   if (event.end) body.end = event.end;
 
-  const res = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
-    {
-      method: 'PATCH',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!res.ok) {
+      const errorBody = await res.text();
+      console.error(`Calendar API Update Error: ${res.status}`, errorBody);
+      throw new Error(`Failed to update event: ${res.status}`);
     }
-  );
 
-  if (!res.ok) {
-    const errorBody = await res.text();
-    console.error(`Calendar API Update Error: ${res.status}`, errorBody);
-    throw new Error(`Failed to update event: ${res.status}`);
+    return await res.json();
+  } catch (error: unknown) {
+    console.error('Error in updateEvent:', error);
+    throw error instanceof Error ? error : new Error('Network error while updating event');
   }
-
-  return await res.json();
 };
 
 /**

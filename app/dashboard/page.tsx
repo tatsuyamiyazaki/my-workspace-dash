@@ -146,13 +146,17 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Fixed Links Section */}
-      <FixedLinkList />
-
-      {/* Custom Links and Notes Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <CustomLinkList />
-        <NotesWidget />
+      {/* Bottom Section: Links and Notes */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        <div className="lg:col-span-1">
+          <FixedLinkList />
+        </div>
+        <div className="lg:col-span-2">
+          <CustomLinkList />
+        </div>
+        <div className="lg:col-span-2">
+          <NotesWidget />
+        </div>
       </div>
     </div>
   );
