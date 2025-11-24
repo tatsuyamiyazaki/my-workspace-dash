@@ -4,6 +4,7 @@ export interface EmailMessage {
   threadId: string;
   snippet: string;
   body?: string; // 本文を追加
+  labelIds?: string[]; // ラベルID (UNREAD, INBOX等)
   headers: {
     subject: string;
     from: string;
@@ -63,6 +64,7 @@ const formatEmailMessage = (email: any): EmailMessage => {
     threadId: email.threadId,
     snippet: email.snippet,
     body: extractBody(email.payload),
+    labelIds: email.labelIds || [],
     headers: {
       subject: getHeader("Subject") || "(No Subject)",
       from: getHeader("From") || "(Unknown Sender)",
@@ -75,25 +77,29 @@ const formatEmailMessage = (email: any): EmailMessage => {
 /**
  * Gmail APIから受信トレイのメールを取得し、整形して返す関数
  * @param accessToken Googleログイン時に取得したアクセストークン
- * @param maxResults 取得件数（デフォルト10件）
+ * @param maxResults 取得件数（デフォルト20件）
  */
-export const fetchInboxParams = async (accessToken: string, maxResults = 10): Promise<EmailMessage[]> => {
+export const fetchInboxEmails = async (accessToken: string, maxResults = 20): Promise<{ count: number, emails: EmailMessage[], unreadCount: number }> => {
   
   // 1. まずメッセージの「IDリスト」を取得 (List API)
-  const listUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:inbox&maxResults=${maxResults}`;
+  const listUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=in:inbox&maxResults=${maxResults}`;
   
   const listRes = await fetch(listUrl, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
   
-  if (!listRes.ok) throw new Error("Failed to fetch message list");
+  if (!listRes.ok) {
+    const errorBody = await listRes.text();
+    console.error(`Gmail API Error: ${listRes.status} ${listRes.statusText}`, errorBody);
+    throw new Error(`Failed to fetch inbox messages: ${listRes.status} ${listRes.statusText}`);
+  }
   const listData = await listRes.json();
   
+  const totalCount = listData.resultSizeEstimate || 0;
   const messages = listData.messages || [];
-  if (messages.length === 0) return [];
+  if (messages.length === 0) return { count: totalCount, emails: [], unreadCount: 0 };
 
   // 2. 取得したIDを使って、並列で「詳細データ」を取りに行く (Get API)
-  // Promise.allを使って一気に叩くのがコツです
   const detailPromises = messages.map(async (msg: { id: string }) => {
     const detailUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`;
     const res = await fetch(detailUrl, {
@@ -105,10 +111,14 @@ export const fetchInboxParams = async (accessToken: string, maxResults = 10): Pr
   const rawDetails = await Promise.all(detailPromises);
 
   // 3. 使いやすい形に整形する
-  // Gmailのヘッダーは配列なので、findで特定のキーを探す必要があります
   const formattedEmails = rawDetails.map(formatEmailMessage);
+  
+  // 4. 未読数をカウント
+  const unreadCount = rawDetails.filter((email: any) => 
+    email.labelIds && email.labelIds.includes('UNREAD')
+  ).length;
 
-  return formattedEmails;
+  return { count: totalCount, emails: formattedEmails, unreadCount };
 };
 
 /**
@@ -160,7 +170,7 @@ export const fetchUnreadEmails = async (accessToken: string, maxResults = 10): P
 };
 
 /**
- * スレッド内の全メッセージを取得する関数
+// スレッド内の全メッセージを取得する関数
  * @param accessToken アクセストークン
  * @param threadId スレッドID
  */
@@ -175,4 +185,52 @@ export const fetchThread = async (accessToken: string, threadId: string): Promis
   const data = await res.json();
   // messages are usually sorted by date in the thread response
   return (data.messages || []).map(formatEmailMessage);
+};
+
+/**
+ * メールを既読にする関数
+ * @param accessToken アクセストークン
+ * @param messageId メッセージID
+ */
+export const markAsRead = async (accessToken: string, messageId: string): Promise<void> => {
+  const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`;
+  const body = {
+    removeLabelIds: ['UNREAD'],
+  };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`Failed to mark as read: ${res.status} ${errorBody}`);
+  }
+};
+
+/**
+ * メールをアーカイブする関数
+ * @param accessToken アクセストークン
+ * @param messageId メッセージID
+ */
+export const archiveEmail = async (accessToken: string, messageId: string): Promise<void> => {
+  const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/modify`;
+  const body = {
+    removeLabelIds: ['INBOX'],
+  };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`Failed to archive email: ${res.status} ${errorBody}`);
+  }
 };

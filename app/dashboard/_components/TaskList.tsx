@@ -6,9 +6,10 @@ import { isToday, parseISO } from 'date-fns';
 
 interface TaskListProps {
   accessToken?: string | null;
+  refreshTrigger?: number;
 }
 
-export default function TaskList({ accessToken }: TaskListProps) {
+export default function TaskList({ accessToken, refreshTrigger }: TaskListProps) {
   const { setAccessToken } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [taskLists, setTaskLists] = useState<ITaskList[]>([]);
@@ -55,7 +56,7 @@ export default function TaskList({ accessToken }: TaskListProps) {
 
   useEffect(() => {
     loadTasks();
-  }, [accessToken]);
+  }, [accessToken, refreshTrigger]);
 
   const handleCreateClick = () => {
     setEditingTask({

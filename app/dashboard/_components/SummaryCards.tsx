@@ -23,8 +23,8 @@ export default function SummaryCards({ unreadCount = 0, todayEventCount = 0, nex
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
       {/* Unread Emails */}
-      <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
-        <div className="flex items-start justify-between mb-4">
+      <div className="bg-white dark:bg-[#1e293b] py-2 px-4 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
+        <div className="flex items-start justify-between mb-2">
           <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">未読メール数</h3>
           <div className="text-red-500 bg-red-50 dark:bg-red-900/20 p-2 rounded-lg">
             <Mail className="w-5 h-5" />
@@ -35,8 +35,8 @@ export default function SummaryCards({ unreadCount = 0, todayEventCount = 0, nex
 
 
       {/* Today's Schedule */}
-      <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
-        <div className="flex items-start justify-between mb-4">
+      <div className="bg-white dark:bg-[#1e293b] py-2 px-4 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
+        <div className="flex items-start justify-between mb-2">
           <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">本日の予定</h3>
           <div className="text-blue-500 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg">
             <Calendar className="w-5 h-5" />
@@ -46,8 +46,8 @@ export default function SummaryCards({ unreadCount = 0, todayEventCount = 0, nex
       </div>
 
       {/* Next Schedule */}
-      <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
-        <div className="flex items-start justify-between mb-4">
+      <div className="bg-white dark:bg-[#1e293b] py-2 px-4 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
+        <div className="flex items-start justify-between mb-2">
           <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">次の予定</h3>
           <div className="text-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 p-2 rounded-lg">
             <Clock className="w-5 h-5" />

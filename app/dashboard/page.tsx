@@ -5,54 +5,86 @@ import CalendarView from './_components/CalendarView';
 import MailList from './_components/MailList';
 import TaskList from './_components/TaskList';
 import LinkList from './_components/LinkList';
-import { useAuth } from '@/contexts/AuthContext';
-import { useEffect, useState } from 'react';
-import { fetchUnreadEmails, EmailMessage } from '@/lib/gmailApi';
+import EventNotifications from './_components/EventNotifications';
+import { useAuth, useSettings } from '@/contexts/AuthContext';
+import { useEffect, useState, useRef } from 'react';
+import { fetchInboxEmails, EmailMessage } from '@/lib/gmailApi';
 import { fetchDashboardCalendarData, CalendarEvent } from '@/lib/calendarApi';
 import { useRouter } from 'next/navigation';
 import { Lock } from 'lucide-react';
 
 export default function DashboardPage() {
   const { accessToken, setAccessToken } = useAuth();
+  const { refreshInterval } = useSettings();
   const router = useRouter();
   const [unreadCount, setUnreadCount] = useState(0);
   const [emails, setEmails] = useState<EmailMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [todayEventCount, setTodayEventCount] = useState(0);
   const [nextEvent, setNextEvent] = useState<CalendarEvent | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const loadData = async () => {
+    if (!accessToken) return;
+    
+    try {
+      setLoading(true);
+      
+      // Fetch Emails from Inbox
+      const emailPromise = fetchInboxEmails(accessToken);
+      
+      // Fetch Calendar Summary
+      const calendarPromise = fetchDashboardCalendarData(accessToken);
+
+      const [emailData, calendarData] = await Promise.all([emailPromise, calendarPromise]);
+
+      setUnreadCount(emailData.unreadCount);
+      setEmails(emailData.emails);
+      setTodayEventCount(calendarData.todayEventCount);
+      setNextEvent(calendarData.nextEvent);
+
+    } catch (error: any) {
+      console.error("Failed to fetch dashboard data", error);
+      if (error.message && error.message.includes('401')) {
+        setAccessToken(null);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadData = async () => {
-      if (!accessToken) return;
-      
-      try {
-        setLoading(true);
-        
-        // Fetch Emails
-        const emailPromise = fetchUnreadEmails(accessToken);
-        
-        // Fetch Calendar Summary
-        const calendarPromise = fetchDashboardCalendarData(accessToken);
-
-        const [emailData, calendarData] = await Promise.all([emailPromise, calendarPromise]);
-
-        setUnreadCount(emailData.count);
-        setEmails(emailData.emails);
-        setTodayEventCount(calendarData.todayEventCount);
-        setNextEvent(calendarData.nextEvent);
-
-      } catch (error: any) {
-        console.error("Failed to fetch dashboard data", error);
-        if (error.message && error.message.includes('401')) {
-          setAccessToken(null);
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadData();
   }, [accessToken]);
+
+  // Auto-refresh based on settings
+  useEffect(() => {
+    if (!accessToken) return;
+    
+    // Clear existing interval
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+
+    // Set new interval
+    intervalRef.current = setInterval(() => {
+      setRefreshKey(prev => prev + 1);
+    }, refreshInterval * 60 * 1000);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [accessToken, refreshInterval]);
+
+  // Refresh data when refreshKey changes
+  useEffect(() => {
+    if (refreshKey > 0) {
+      loadData();
+    }
+  }, [refreshKey]);
 
   if (!accessToken) {
     return (
@@ -78,6 +110,9 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Event Notifications Handler */}
+      <EventNotifications accessToken={accessToken} />
+
       {/* Top Row: Summary Cards */}
       <SummaryCards 
         unreadCount={unreadCount} 
@@ -88,18 +123,24 @@ export default function DashboardPage() {
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Left Column: Mail List */}
-        <div className="lg:col-span-1 h-full">
-          <MailList emails={emails} loading={loading} accessToken={accessToken} />
+        <div className="lg:col-span-1">
+          <MailList 
+            emails={emails} 
+            loading={loading} 
+            accessToken={accessToken} 
+            unreadCount={unreadCount} 
+            onRefresh={loadData}
+          />
         </div>
 
         {/* Center Column: Calendar */}
         <div className="lg:col-span-2 h-full">
-          <CalendarView accessToken={accessToken} />
+          <CalendarView accessToken={accessToken} refreshTrigger={refreshKey} />
         </div>
 
         {/* Right Column: Task List */}
         <div className="lg:col-span-1 h-full">
-          <TaskList accessToken={accessToken} />
+          <TaskList accessToken={accessToken} refreshTrigger={refreshKey} />
         </div>
       </div>
 

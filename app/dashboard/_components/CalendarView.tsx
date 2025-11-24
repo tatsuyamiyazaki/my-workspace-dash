@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ChevronLeft, ChevronRight, X, Clock, Calendar as CalendarIcon, Plus } from 'lucide-react';
 import { 
   format, 
@@ -25,6 +25,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 interface CalendarViewProps {
   accessToken?: string | null;
+  refreshTrigger?: number;
 }
 
 type ViewMode = 'month' | 'week' | 'day';
@@ -52,7 +53,7 @@ const RECURRENCE_OPTIONS = [
   { value: 'custom', label: 'カスタム' },
 ];
 
-export default function CalendarView({ accessToken }: CalendarViewProps) {
+export default function CalendarView({ accessToken, refreshTrigger }: CalendarViewProps) {
   const { setAccessToken } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [now, setNow] = useState(new Date());
@@ -64,6 +65,7 @@ export default function CalendarView({ accessToken }: CalendarViewProps) {
   const [dragSelection, setDragSelection] = useState<{ date: Date, startY: number, currentY: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   // Update current time every minute
   useEffect(() => {
@@ -71,10 +73,19 @@ export default function CalendarView({ accessToken }: CalendarViewProps) {
     return () => clearInterval(timer);
   }, []);
 
+  // Scroll to current time when viewMode is week or day
+  useEffect(() => {
+    if (timelineRef.current && (viewMode === 'week' || viewMode === 'day')) {
+      const currentHour = now.getHours();
+      const scrollPosition = (currentHour - 1) * 60; // Scroll to one hour before current hour
+      timelineRef.current.scrollTop = scrollPosition;
+    }
+  }, [viewMode, now]);
+
   // Fetch events when date or view mode changes
   useEffect(() => {
     loadEvents();
-  }, [currentDate, viewMode, accessToken]);
+  }, [currentDate, viewMode, accessToken, refreshTrigger]);
 
   const loadEvents = async () => {
     if (!accessToken) return;
@@ -419,7 +430,7 @@ export default function CalendarView({ accessToken }: CalendarViewProps) {
         )}
 
         {/* Timeline Body */}
-        <div className="flex-1 overflow-y-auto relative">
+        <div className="flex-1 overflow-y-auto relative" ref={timelineRef}>
           <div className="flex" style={{ height: `${24 * HOUR_HEIGHT}px` }}>
             {/* Time Labels */}
             <div className="w-14 flex-shrink-0 border-r border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50">

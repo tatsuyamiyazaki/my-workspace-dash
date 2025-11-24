@@ -5,6 +5,7 @@ import { LayoutGrid, Settings } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import SettingsModal from './_components/SettingsModal';
 
 function CurrentDateTime() {
   const [date, setDate] = useState<Date | null>(null);
@@ -32,6 +33,7 @@ export default function DashboardLayout({
 }) {
   const { user, loading } = useAuth();
   const router = useRouter();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -60,7 +62,10 @@ export default function DashboardLayout({
 
         <div className="flex items-center gap-4">
           <ThemeToggle />
-          <button className="p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-800 rounded-full transition-colors">
+          <button 
+            onClick={() => setIsSettingsOpen(true)}
+            className="p-2 text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-slate-800 rounded-full transition-colors"
+          >
             <Settings className="w-5 h-5" />
           </button>
           <CurrentDateTime />
@@ -85,6 +90,8 @@ export default function DashboardLayout({
       <main className="p-6 w-full">
         {children}
       </main>
+
+      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
     </div>
   );
 }

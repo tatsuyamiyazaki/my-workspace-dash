@@ -1,19 +1,22 @@
-import { EmailMessage, fetchThread } from '@/lib/gmailApi';
+import { EmailMessage, fetchThread, markAsRead, archiveEmail } from '@/lib/gmailApi';
 import { format, isToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { useState } from 'react';
-import { X, Reply, ExternalLink, User, Clock } from 'lucide-react';
+import { X, Reply, ExternalLink, User, Clock, Archive, Mail, MailOpen } from 'lucide-react';
 
 interface MailListProps {
   emails: EmailMessage[];
   loading?: boolean;
   accessToken?: string | null;
+  unreadCount?: number;
+  onRefresh?: () => void;
 }
 
-export default function MailList({ emails, loading = false, accessToken }: MailListProps) {
+export default function MailList({ emails, loading = false, accessToken, unreadCount = 0, onRefresh }: MailListProps) {
   const [selectedThread, setSelectedThread] = useState<EmailMessage[] | null>(null);
   const [currentThreadIndex, setCurrentThreadIndex] = useState(0);
   const [loadingThread, setLoadingThread] = useState(false);
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
 
   const handleEmailClick = async (email: EmailMessage) => {
     if (!accessToken) return;
@@ -25,6 +28,8 @@ export default function MailList({ emails, loading = false, accessToken }: MailL
       setSelectedThread(threadMessages);
       // 最新のメッセージ（通常は最後）を表示
       setCurrentThreadIndex(threadMessages.length - 1);
+      // 既読化（Gmail API）
+      await markAsRead(accessToken, email.id);
     } catch (error) {
       console.error("Failed to fetch thread", error);
       // フォールバック: 単一メッセージのみ表示
@@ -36,6 +41,19 @@ export default function MailList({ emails, loading = false, accessToken }: MailL
   };
 
   const currentMessage = selectedThread ? selectedThread[currentThreadIndex] : null;
+
+  const handleArchive = async (email: EmailMessage) => {
+    if (!accessToken) return;
+    try {
+      await archiveEmail(accessToken, email.id);
+      setSelectedThread(null); // Close the modal after successful archive
+      if (onRefresh) {
+        onRefresh();
+      }
+    } catch (e) {
+      console.error("Failed to archive email:", e); // Log the error instead of alerting
+    }
+  };
 
   const getInitial = (name: string) => name.charAt(0).toUpperCase();
   
@@ -80,9 +98,9 @@ export default function MailList({ emails, loading = false, accessToken }: MailL
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-full">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">メール一覧</h2>
-        <div className="space-y-6">
+      <div className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-[600px] flex flex-col overflow-hidden">
+        <h2 className="text-lg font-bold text-gray-900 dark:text-white p-6 pb-4 flex-shrink-0">メール一覧</h2>
+        <div className="px-6 pb-6 space-y-6 overflow-y-auto flex-1">
           {[...Array(4)].map((_, i) => (
             <div key={i} className="flex items-start gap-4 animate-pulse">
               <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-slate-700 flex-shrink-0" />
@@ -97,15 +115,36 @@ export default function MailList({ emails, loading = false, accessToken }: MailL
     );
   }
 
+  // Filter emails based on unread status
+  const filteredEmails = showUnreadOnly 
+    ? emails.filter(email => email.labelIds?.includes('UNREAD'))
+    : emails;
+
   return (
     <>
-      <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-full">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">メール一覧</h2>
-        <div className="space-y-6">
-          {emails.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400 text-sm">未読メールはありません</p>
+      <div className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-[600px] flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white">メール一覧</h2>
+          <button
+            onClick={() => setShowUnreadOnly(!showUnreadOnly)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              showUnreadOnly
+                ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
+                : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
+            }`}
+            title={showUnreadOnly ? 'すべて表示' : '未読のみ表示'}
+          >
+            {showUnreadOnly ? <Mail className="w-4 h-4" /> : <MailOpen className="w-4 h-4" />}
+            {showUnreadOnly ? '未読のみ' : 'すべて'}
+          </button>
+        </div>
+        <div className="px-6 pb-6 space-y-6 overflow-y-auto flex-1">
+          {filteredEmails.length === 0 ? (
+            <p className="text-gray-500 dark:text-gray-400 text-sm">
+              {showUnreadOnly ? '未読メールはありません' : 'メールはありません'}
+            </p>
           ) : (
-            emails.map((email) => {
+            filteredEmails.map((email) => {
               const senderName = getSenderName(email.headers.from);
               const initial = getInitial(senderName);
               const color = getColor(initial);
@@ -176,6 +215,13 @@ export default function MailList({ emails, loading = false, accessToken }: MailL
                   >
                     <ExternalLink className="w-4 h-4" />
                     Gmailで開く
+                  </button>
+                  <button
+                    onClick={() => handleArchive(currentMessage)}
+                    className="flex items-center gap-2 px-4 py-1.5 bg-amber-100 text-amber-700 text-sm font-bold rounded-lg hover:bg-amber-200 transition-colors"
+                  >
+                    <Archive className="w-4 h-4" />
+                    アーカイブ
                   </button>
                 </div>
 
