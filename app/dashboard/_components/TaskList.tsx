@@ -146,7 +146,7 @@ export default function TaskList({ accessToken, refreshTrigger }: TaskListProps)
 
   return (
     <>
-      <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-full flex flex-col">
+      <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-[480px] flex flex-col">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">未完了タスク</h2>
           <div className="flex items-center gap-2">

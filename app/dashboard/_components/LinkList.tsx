@@ -1,57 +1,31 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   Folder, MessageSquare, FileText, ChevronRight, Plus, X, Trash2, Edit2,
   ExternalLink, BookOpen, Code, Globe, Mail, User, Star, Heart, Zap, 
   Home, Settings, Calendar, Search, Clock, ChevronDown, FolderPlus
 } from 'lucide-react';
 import { ICON_OPTIONS } from '@/lib/constants';
-import { useSettings } from '@/contexts/AuthContext';
-
-interface CustomLink {
-  id: string;
-  name: string;
-  url: string;
-  icon: string;
-  folderId?: string;
-}
-
-interface LinkFolder {
-  id: string;
-  name: string;
-  icon: string;
-  isExpanded: boolean;
-}
+import { useSettings, CustomLink, LinkFolder } from '@/contexts/AuthContext';
 
 export default function LinkList() {
-  const { fixedLinks } = useSettings();
-  const [customLinks, setCustomLinks] = useState<CustomLink[]>([]);
-  const [folders, setFolders] = useState<LinkFolder[]>([]);
+  const { 
+    fixedLinks,
+    customLinks, setCustomLinks,
+    folders, setFolders
+   } = useSettings();
   const [editingLink, setEditingLink] = useState<CustomLink | null>(null);
   const [editingFolder, setEditingFolder] = useState<LinkFolder | null>(null);
   const [isCreatingLink, setIsCreatingLink] = useState(false);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
-  useEffect(() => {
-    const storedLinks = localStorage.getItem('customLinks');
-    const storedFolders = localStorage.getItem('linkFolders');
-    if (storedLinks) {
-      setCustomLinks(JSON.parse(storedLinks));
-    }
-    if (storedFolders) {
-      setFolders(JSON.parse(storedFolders));
-    }
-  }, []);
-
   const saveLinks = (links: CustomLink[]) => {
     setCustomLinks(links);
-    localStorage.setItem('customLinks', JSON.stringify(links));
   };
 
   const saveFolders = (newFolders: LinkFolder[]) => {
     setFolders(newFolders);
-    localStorage.setItem('linkFolders', JSON.stringify(newFolders));
   };
 
   const handleCreateLinkClick = (folderId?: string) => {

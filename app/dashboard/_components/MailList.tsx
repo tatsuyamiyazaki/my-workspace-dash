@@ -98,7 +98,7 @@ export default function MailList({ emails, loading = false, accessToken, unreadC
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-[600px] flex flex-col overflow-hidden">
+      <div className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-[480px] flex flex-col overflow-hidden">
         <h2 className="text-lg font-bold text-gray-900 dark:text-white p-6 pb-4 flex-shrink-0">メール一覧</h2>
         <div className="px-6 pb-6 space-y-6 overflow-y-auto flex-1">
           {[...Array(4)].map((_, i) => (
@@ -122,7 +122,7 @@ export default function MailList({ emails, loading = false, accessToken, unreadC
 
   return (
     <>
-      <div className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-[600px] flex flex-col overflow-hidden">
+      <div className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-[480px] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0">
           <h2 className="text-lg font-bold text-gray-900 dark:text-white">メール一覧</h2>
           <button

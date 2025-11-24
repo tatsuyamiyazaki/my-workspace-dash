@@ -93,11 +93,11 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
     let start: Date, end: Date;
 
     if (viewMode === 'month') {
-      start = startOfWeek(startOfMonth(currentDate));
-      end = endOfWeek(endOfMonth(currentDate));
+      start = startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 });
+      end = endOfWeek(endOfMonth(currentDate), { weekStartsOn: 1 });
     } else if (viewMode === 'week') {
-      start = startOfWeek(currentDate);
-      end = endOfWeek(currentDate);
+      start = startOfWeek(currentDate, { weekStartsOn: 1 });
+      end = endOfWeek(currentDate, { weekStartsOn: 1 });
     } else {
       start = startOfDay(currentDate);
       end = endOfDay(currentDate);
@@ -349,7 +349,7 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
     const startDate = startOfWeek(monthStart);
     const endDate = endOfWeek(monthEnd);
     const days = eachDayOfInterval({ start: startDate, end: endDate });
-    const weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+    const weekDays = ['月', '火', '水', '木', '金', '土', '日'];
 
     return (
       <>
@@ -546,7 +546,7 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
   };
 
   const renderWeekView = () => {
-    const startDate = startOfWeek(currentDate);
+    const startDate = startOfWeek(currentDate, { weekStartsOn: 1 });
     const days = [...Array(7)].map((_, i) => addDays(startDate, i));
     return renderTimelineView(days);
   };
@@ -557,7 +557,7 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
 
   return (
     <>
-      <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-[600px] flex flex-col">
+      <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-[480px] flex flex-col">
         {renderHeader()}
         <div className="flex-1 min-h-0">
           {loading ? (

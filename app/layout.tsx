@@ -36,11 +36,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <SettingsProvider>
-            <AuthProvider>
+          <AuthProvider>
+            <SettingsProvider>
               {children}
-            </AuthProvider>
-          </SettingsProvider>
+            </SettingsProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
