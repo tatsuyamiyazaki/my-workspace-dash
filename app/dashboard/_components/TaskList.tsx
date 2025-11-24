@@ -58,6 +58,18 @@ export default function TaskList({ accessToken, refreshTrigger }: TaskListProps)
     loadTasks();
   }, [loadTasks, refreshTrigger]);
 
+  // Escキー対応
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && editingTask) {
+        setEditingTask(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editingTask]);
+
   const handleCreateClick = () => {
     setEditingTask({
       title: '',

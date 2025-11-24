@@ -68,22 +68,46 @@ const decodeBase64 = (data: string) => {
   }
 };
 
+// テキストメール（text/plain）をHTMLに変換する関数
+// あらゆる改行コード(\r\n, \r, \n)に対応
+const convertTextToHtml = (text: string): string => {
+  // HTMLエスケープ（XSS対策）
+  const escaped = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+  // あらゆる改行コードをHTMLの<br>タグに変換
+  // 重要：\r\nを最初に処理して、\rと\nの重複処理を防ぐ
+  return escaped
+    .replace(/\r\n/g, '<br>')
+    .replace(/\r/g, '<br>')
+    .replace(/\n/g, '<br>');
+};
+
 // ペイロードから本文を抽出する関数
+// テキストメールの場合は改行コード対応を行う
 const extractBody = (payload: GmailMessagePayload): string => {
   let encodedBody = '';
-  
+  let mimeType = '';
+
   if (payload.body && payload.body.data) {
     encodedBody = payload.body.data;
+    mimeType = payload.mimeType;
   } else if (payload.parts) {
     // text/html を優先して探す
     const htmlPart = payload.parts.find((p: GmailMessagePart) => p.mimeType === 'text/html');
     if (htmlPart && htmlPart.body && htmlPart.body.data) {
       encodedBody = htmlPart.body.data;
+      mimeType = 'text/html';
     } else {
       // なければ text/plain を探す
       const textPart = payload.parts.find((p: GmailMessagePart) => p.mimeType === 'text/plain');
       if (textPart && textPart.body && textPart.body.data) {
         encodedBody = textPart.body.data;
+        mimeType = 'text/plain';
       } else {
         // さらにネストしている場合（multipart/alternativeなど）の再帰探索は今回は簡易的に省略し、
         // 最初のパーツを見るなどのフォールバックを入れることも可能ですが、
@@ -91,8 +115,16 @@ const extractBody = (payload: GmailMessagePayload): string => {
       }
     }
   }
-  
-  return decodeBase64(encodedBody);
+
+  const decodedBody = decodeBase64(encodedBody);
+
+  // text/plainの場合は改行コードを<br>に変換
+  if (mimeType === 'text/plain') {
+    return convertTextToHtml(decodedBody);
+  }
+
+  // text/htmlの場合はそのまま返す
+  return decodedBody;
 };
 
 // Helper to format a single message

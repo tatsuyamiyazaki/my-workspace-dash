@@ -117,6 +117,26 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
   useEffect(() => {
     loadEvents();
   }, [loadEvents, refreshTrigger]);
+
+  // Escキー対応
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // 予定編集モーダルが開いている場合は閉じる
+        if (editingEvent) {
+          setEditingEvent(null);
+        }
+        // 日付イベント詳細モーダルが開いている場合は閉じる
+        else if (selectedDateEvents) {
+          setSelectedDateEvents(null);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editingEvent, selectedDateEvents]);
+
   const handleEventClick = async (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditingEvent(event);

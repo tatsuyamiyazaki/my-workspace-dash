@@ -1,7 +1,7 @@
 import { EmailMessage, fetchThread, markAsRead, archiveEmail } from '@/lib/gmailApi';
 import { format, isToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, Reply, ExternalLink, User, Clock, Archive, Mail, MailOpen } from 'lucide-react';
 
 interface MailListProps {
@@ -16,6 +16,18 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
   const [currentThreadIndex, setCurrentThreadIndex] = useState(0);
   const [loadingThread, setLoadingThread] = useState(false);
   const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+
+  // Escキー対応
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedThread) {
+        setSelectedThread(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedThread]);
 
   const handleEmailClick = async (email: EmailMessage) => {
     if (!accessToken) return;

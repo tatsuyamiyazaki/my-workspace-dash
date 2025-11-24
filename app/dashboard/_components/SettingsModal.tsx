@@ -42,6 +42,26 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     }
   }, [refreshInterval, notificationMinutes, notificationsEnabled, fixedLinks, isOpen]);
 
+  // Escキー対応
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // ネストされたリンク編集モーダルが開いている場合は閉じる
+        if (editingLink) {
+          setEditingLink(null);
+        } else {
+          // メインモーダルを閉じる
+          onClose();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, editingLink, onClose]);
+
   const handleSave = async () => {
     setRefreshInterval(tempInterval);
     setNotificationMinutes(tempNotifications);
