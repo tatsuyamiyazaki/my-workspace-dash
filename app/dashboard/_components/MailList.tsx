@@ -15,7 +15,7 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
   const [selectedThread, setSelectedThread] = useState<EmailMessage[] | null>(null);
   const [currentThreadIndex, setCurrentThreadIndex] = useState(0);
   const [loadingThread, setLoadingThread] = useState(false);
-  const [showUnreadOnly, setShowUnreadOnly] = useState(false);
+  const [showUnreadOnly, setShowUnreadOnly] = useState(true);
   const [isMaximized, setIsMaximized] = useState(false);
 
   // Escキー対応

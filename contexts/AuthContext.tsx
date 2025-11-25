@@ -1,15 +1,18 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
+import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { auth, db } from '@/lib/firebase';
+import { auth, db, googleProvider } from '@/lib/firebase';
 
 interface AuthContextType {
   user: User | null;
   accessToken: string | null;
-  setAccessToken: (token: string | null) => void;
+  setAccessToken: (token: string | null, expiresIn?: number) => void;
   loading: boolean;
+  refreshAccessToken: () => Promise<string | null>;
+  getValidAccessToken: () => Promise<string | null>;
+  isTokenExpired: () => boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -17,24 +20,120 @@ const AuthContext = createContext<AuthContextType>({
   accessToken: null,
   setAccessToken: () => {},
   loading: true,
+  refreshAccessToken: async () => null,
+  getValidAccessToken: async () => null,
+  isTokenExpired: () => true,
 });
 
 const ACCESS_TOKEN_KEY = 'google_access_token';
+const TOKEN_EXPIRY_KEY = 'google_token_expiry';
+// トークンの有効期限は1時間だが、余裕を持って50分で更新する
+const TOKEN_REFRESH_BUFFER_MS = 10 * 60 * 1000; // 10分前に更新
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [accessToken, setAccessTokenState] = useState<string | null>(null);
+  const [tokenExpiry, setTokenExpiry] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isRefreshingRef = useRef(false);
+
+  // トークンが期限切れかどうかをチェック
+  const isTokenExpired = useCallback(() => {
+    if (!tokenExpiry) return true;
+    return Date.now() >= tokenExpiry - TOKEN_REFRESH_BUFFER_MS;
+  }, [tokenExpiry]);
 
   // sessionStorageへの保存も行うsetAccessToken
-  const setAccessToken = useCallback((token: string | null) => {
+  const setAccessToken = useCallback((token: string | null, expiresIn?: number) => {
     setAccessTokenState(token);
     if (token) {
       sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
+      // expiresInが指定されていれば有効期限を設定、なければデフォルト1時間
+      const expiry = Date.now() + (expiresIn || 3600) * 1000;
+      setTokenExpiry(expiry);
+      sessionStorage.setItem(TOKEN_EXPIRY_KEY, expiry.toString());
     } else {
       sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+      sessionStorage.removeItem(TOKEN_EXPIRY_KEY);
+      setTokenExpiry(null);
     }
   }, []);
+
+  // トークンを更新する関数
+  const refreshAccessToken = useCallback(async (): Promise<string | null> => {
+    if (!user) return null;
+
+    // 既に更新中の場合は待機
+    if (isRefreshingRef.current) {
+      // 更新が完了するまで少し待つ
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      return sessionStorage.getItem(ACCESS_TOKEN_KEY);
+    }
+
+    isRefreshingRef.current = true;
+
+    try {
+      // Googleで再認証してトークンを更新
+      const result = await signInWithPopup(auth, googleProvider);
+      const credential = GoogleAuthProvider.credentialFromResult(result);
+      const newAccessToken = credential?.accessToken;
+
+      if (newAccessToken) {
+        setAccessToken(newAccessToken, 3600);
+        console.log('Access token refreshed successfully');
+        return newAccessToken;
+      }
+      return null;
+    } catch (error) {
+      console.error('Failed to refresh access token:', error);
+      return null;
+    } finally {
+      isRefreshingRef.current = false;
+    }
+  }, [user, setAccessToken]);
+
+  // 有効なトークンを取得する（期限切れなら更新）
+  const getValidAccessToken = useCallback(async (): Promise<string | null> => {
+    if (!accessToken) return null;
+
+    if (isTokenExpired()) {
+      console.log('Token expired or expiring soon, refreshing...');
+      return await refreshAccessToken();
+    }
+
+    return accessToken;
+  }, [accessToken, isTokenExpired, refreshAccessToken]);
+
+  // トークン自動更新のタイマーを設定
+  useEffect(() => {
+    if (!tokenExpiry || !user) return;
+
+    // 既存のタイマーをクリア
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+    }
+
+    // 更新タイミングを計算（期限の10分前）
+    const refreshTime = tokenExpiry - TOKEN_REFRESH_BUFFER_MS - Date.now();
+
+    if (refreshTime > 0) {
+      console.log(`Token will be refreshed in ${Math.round(refreshTime / 1000 / 60)} minutes`);
+      refreshTimerRef.current = setTimeout(async () => {
+        console.log('Auto-refreshing token...');
+        await refreshAccessToken();
+      }, refreshTime);
+    } else if (refreshTime > -TOKEN_REFRESH_BUFFER_MS) {
+      // 既に更新タイミングを過ぎているが、まだ有効期限内なら即座に更新
+      refreshAccessToken();
+    }
+
+    return () => {
+      if (refreshTimerRef.current) {
+        clearTimeout(refreshTimerRef.current);
+      }
+    };
+  }, [tokenExpiry, user, refreshAccessToken]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -43,13 +142,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (user) {
         // ユーザーが認証済みならsessionStorageからトークンを復元
         const storedToken = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+        const storedExpiry = sessionStorage.getItem(TOKEN_EXPIRY_KEY);
         if (storedToken) {
           setAccessTokenState(storedToken);
+          if (storedExpiry) {
+            const expiry = parseInt(storedExpiry, 10);
+            setTokenExpiry(expiry);
+            // 復元したトークンが期限切れに近い場合は更新
+            if (Date.now() >= expiry - TOKEN_REFRESH_BUFFER_MS) {
+              console.log('Restored token is expired or expiring soon');
+            }
+          }
         }
       } else {
         // ログアウト時はトークンをクリア
         setAccessTokenState(null);
+        setTokenExpiry(null);
         sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+        sessionStorage.removeItem(TOKEN_EXPIRY_KEY);
       }
     });
 
@@ -57,7 +167,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, accessToken, setAccessToken, loading }}>
+    <AuthContext.Provider value={{
+      user,
+      accessToken,
+      setAccessToken,
+      loading,
+      refreshAccessToken,
+      getValidAccessToken,
+      isTokenExpired,
+    }}>
       {children}
     </AuthContext.Provider>
   );

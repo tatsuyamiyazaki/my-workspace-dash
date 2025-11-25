@@ -19,10 +19,11 @@ export default function LoginPage() {
       const result = await signInWithPopup(auth, googleProvider);
       const credential = GoogleAuthProvider.credentialFromResult(result);
       const accessToken = credential?.accessToken;
-      
+
       if (accessToken) {
         console.log("Access Token:", accessToken);
-        setAccessToken(accessToken);
+        // トークンの有効期限は1時間（3600秒）
+        setAccessToken(accessToken, 3600);
         // ログイン成功したらダッシュボードへ遷移
         router.push('/dashboard');
       }

@@ -54,10 +54,10 @@ const RECURRENCE_OPTIONS = [
 ];
 
 export default function CalendarView({ accessToken, refreshTrigger }: CalendarViewProps) {
-  const { setAccessToken } = useAuth();
+  const { setAccessToken, getValidAccessToken } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [now, setNow] = useState(new Date());
-  const [viewMode, setViewMode] = useState<ViewMode>('month');
+  const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [selectedDateEvents, setSelectedDateEvents] = useState<{ date: Date, events: CalendarEvent[] } | null>(null);
   const [isModalMaximized, setIsModalMaximized] = useState(false);
@@ -87,7 +87,13 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
 
     try {
       setLoading(true);
-      const fetchedEvents = await fetchEvents(accessToken, start, end);
+      // 有効なトークンを取得（期限切れなら自動更新）
+      const validToken = await getValidAccessToken();
+      if (!validToken) {
+        setAccessToken(null);
+        return;
+      }
+      const fetchedEvents = await fetchEvents(validToken, start, end);
       setEvents(fetchedEvents);
     } catch (error: unknown) {
       console.error("Failed to fetch calendar events", error);
@@ -97,7 +103,7 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
     } finally {
       setLoading(false);
     }
-  }, [accessToken, currentDate, viewMode, setAccessToken]);
+  }, [accessToken, currentDate, viewMode, setAccessToken, getValidAccessToken]);
 
   // Update current time every minute
   useEffect(() => {

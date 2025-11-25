@@ -10,7 +10,7 @@ interface TaskListProps {
 }
 
 export default function TaskList({ accessToken, refreshTrigger }: TaskListProps) {
-  const { setAccessToken } = useAuth();
+  const { setAccessToken, getValidAccessToken } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [taskLists, setTaskLists] = useState<ITaskList[]>([]);
   const [loading, setLoading] = useState(false);
@@ -20,22 +20,29 @@ export default function TaskList({ accessToken, refreshTrigger }: TaskListProps)
 
   const loadTasks = useCallback(async () => {
     if (!accessToken) return;
-    
+
     try {
       setLoading(true);
+      // 有効なトークンを取得（期限切れなら自動更新）
+      const validToken = await getValidAccessToken();
+      if (!validToken) {
+        setAccessToken(null);
+        return;
+      }
+
       // 1. Fetch all task lists
-      const lists = await fetchTaskLists(accessToken);
+      const lists = await fetchTaskLists(validToken);
       setTaskLists(lists);
 
       // 2. Fetch tasks from all lists
       const allTasksPromises = lists.map(async (list) => {
-        const listTasks = await fetchTasks(accessToken, list.id);
+        const listTasks = await fetchTasks(validToken, list.id);
         return listTasks.map(t => ({ ...t, taskListId: list.id }));
       });
 
       const results = await Promise.all(allTasksPromises);
       const allTasks = results.flat();
-      
+
       // Sort by due date (optional but good)
       allTasks.sort((a, b) => {
         if (!a.due) return 1;
@@ -52,7 +59,7 @@ export default function TaskList({ accessToken, refreshTrigger }: TaskListProps)
     } finally {
       setLoading(false);
     }
-  }, [accessToken, setAccessToken]);
+  }, [accessToken, setAccessToken, getValidAccessToken]);
 
   useEffect(() => {
     loadTasks();

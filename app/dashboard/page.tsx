@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation';
 import { Lock } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { accessToken, setAccessToken } = useAuth();
+  const { accessToken, setAccessToken, getValidAccessToken } = useAuth();
   const { refreshInterval } = useSettings();
   const router = useRouter();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -29,15 +29,23 @@ export default function DashboardPage() {
 
   const loadData = useCallback(async () => {
     if (!accessToken) return;
-    
+
     try {
       setLoading(true);
-      
+
+      // 有効なトークンを取得（期限切れなら自動更新）
+      const validToken = await getValidAccessToken();
+      if (!validToken) {
+        console.error('Failed to get valid access token');
+        setAccessToken(null);
+        return;
+      }
+
       // Fetch Emails from Inbox
-      const emailPromise = fetchInboxEmails(accessToken);
-      
+      const emailPromise = fetchInboxEmails(validToken);
+
       // Fetch Calendar Summary
-      const calendarPromise = fetchDashboardCalendarData(accessToken);
+      const calendarPromise = fetchDashboardCalendarData(validToken);
 
       const [emailData, calendarData] = await Promise.all([emailPromise, calendarPromise]);
 
@@ -54,7 +62,7 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, [accessToken, setAccessToken]);
+  }, [accessToken, setAccessToken, getValidAccessToken]);
 
   useEffect(() => {
     loadData();
