@@ -19,17 +19,37 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
 });
 
+const ACCESS_TOKEN_KEY = 'google_access_token';
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [accessToken, setAccessTokenState] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // sessionStorageへの保存も行うsetAccessToken
+  const setAccessToken = useCallback((token: string | null) => {
+    setAccessTokenState(token);
+    if (token) {
+      sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
+    } else {
+      sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    }
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
-      if (!user) {
-        setAccessToken(null);
+      if (user) {
+        // ユーザーが認証済みならsessionStorageからトークンを復元
+        const storedToken = sessionStorage.getItem(ACCESS_TOKEN_KEY);
+        if (storedToken) {
+          setAccessTokenState(storedToken);
+        }
+      } else {
+        // ログアウト時はトークンをクリア
+        setAccessTokenState(null);
+        sessionStorage.removeItem(ACCESS_TOKEN_KEY);
       }
     });
 
