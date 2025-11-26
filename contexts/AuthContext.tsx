@@ -18,7 +18,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   accessToken: null,
-  setAccessToken: () => {},
+  setAccessToken: () => { },
   loading: true,
   refreshAccessToken: async () => null,
   getValidAccessToken: async () => null,
@@ -85,8 +85,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return newAccessToken;
       }
       return null;
-    } catch (error) {
-      console.error('Failed to refresh access token:', error);
+    } catch (error: any) {
+      if (error.code === 'auth/popup-blocked') {
+        console.warn('Token refresh failed: Popup was blocked. User interaction is required to refresh the token.');
+      } else {
+        console.error('Failed to refresh access token:', error);
+      }
       return null;
     } finally {
       isRefreshingRef.current = false;
@@ -105,35 +109,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return accessToken;
   }, [accessToken, isTokenExpired, refreshAccessToken]);
 
-  // トークン自動更新のタイマーを設定
+  // トークン自動更新のタイマーは削除
+  // ブラウザのポップアップブロッカーにより、ユーザー操作を伴わないsignInWithPopupはブロックされるため
+  // 自動更新は行わず、必要に応じてユーザーに再認証を求めるか、
+  // ユーザー操作（ボタンクリックなど）のタイミングでrefreshAccessTokenを呼び出す必要があります。
   useEffect(() => {
-    if (!tokenExpiry || !user) return;
-
-    // 既存のタイマーをクリア
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current);
-    }
-
-    // 更新タイミングを計算（期限の10分前）
-    const refreshTime = tokenExpiry - TOKEN_REFRESH_BUFFER_MS - Date.now();
-
-    if (refreshTime > 0) {
-      console.log(`Token will be refreshed in ${Math.round(refreshTime / 1000 / 60)} minutes`);
-      refreshTimerRef.current = setTimeout(async () => {
-        console.log('Auto-refreshing token...');
-        await refreshAccessToken();
-      }, refreshTime);
-    } else if (refreshTime > -TOKEN_REFRESH_BUFFER_MS) {
-      // 既に更新タイミングを過ぎているが、まだ有効期限内なら即座に更新
-      refreshAccessToken();
-    }
-
+    // クリーンアップのみ行う
     return () => {
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current);
       }
     };
-  }, [tokenExpiry, user, refreshAccessToken]);
+  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -229,17 +216,17 @@ interface SettingsContextType {
 
 const SettingsContext = createContext<SettingsContextType>({
   refreshInterval: 1,
-  setRefreshInterval: () => {},
+  setRefreshInterval: () => { },
   notificationMinutes: [5, 15],
-  setNotificationMinutes: () => {},
+  setNotificationMinutes: () => { },
   notificationsEnabled: false,
-  setNotificationsEnabled: () => {},
+  setNotificationsEnabled: () => { },
   fixedLinks: DEFAULT_FIXED_LINKS,
-  setFixedLinks: () => {},
+  setFixedLinks: () => { },
   customLinks: [],
-  setCustomLinks: () => {},
+  setCustomLinks: () => { },
   folders: [],
-  setFolders: () => {},
+  setFolders: () => { },
 });
 
 export const SettingsProvider = ({ children }: { children: ReactNode }) => {
@@ -267,7 +254,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
 
     // Firestoreに保存
     await setDoc(doc(db, "users", uid), initialData, { merge: true });
-    
+
     // オプション: 移行後にローカルストレージをクリアするならここで実行
     // localStorage.clear();
   }, []);
@@ -358,7 +345,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <SettingsContext.Provider value={{ 
+    <SettingsContext.Provider value={{
       refreshInterval, setRefreshInterval,
       notificationMinutes, setNotificationMinutes,
       notificationsEnabled, setNotificationsEnabled,

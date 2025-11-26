@@ -36,7 +36,9 @@ export default function DashboardPage() {
       // 有効なトークンを取得（期限切れなら自動更新）
       const validToken = await getValidAccessToken();
       if (!validToken) {
-        console.error('Failed to get valid access token');
+        // トークンが無効または更新失敗（ポップアップブロック等）の場合は
+        // ログアウト状態にして再認証画面を表示する
+        console.warn('Access token is invalid or expired. Redirecting to re-auth.');
         setAccessToken(null);
         return;
       }
@@ -71,7 +73,7 @@ export default function DashboardPage() {
   // Auto-refresh based on settings
   useEffect(() => {
     if (!accessToken) return;
-    
+
     // Clear existing interval
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -124,20 +126,20 @@ export default function DashboardPage() {
       <EventNotifications accessToken={accessToken} />
 
       {/* Top Row: Summary Cards */}
-      <SummaryCards 
-        unreadCount={unreadCount} 
-        todayEventCount={todayEventCount} 
-        nextEvent={nextEvent} 
+      <SummaryCards
+        unreadCount={unreadCount}
+        todayEventCount={todayEventCount}
+        nextEvent={nextEvent}
       />
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Left Column: Mail List */}
         <div className="lg:col-span-1">
-          <MailList 
-            emails={emails} 
-            loading={loading} 
-            accessToken={accessToken} 
+          <MailList
+            emails={emails}
+            loading={loading}
+            accessToken={accessToken}
             onRefresh={loadData}
           />
         </div>
