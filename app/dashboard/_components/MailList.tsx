@@ -17,6 +17,7 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
   const [loadingThread, setLoadingThread] = useState(false);
   const [showUnreadOnly, setShowUnreadOnly] = useState(true);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [pendingLink, setPendingLink] = useState<string | null>(null);
 
   // Escキー対応
   useEffect(() => {
@@ -84,6 +85,28 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
     } catch (error: unknown) {
       console.error("Failed to delete email:", error);
     }
+  };
+
+  // メール本文内のリンククリックをハンドル
+  const handleBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const anchor = target.closest('a');
+    if (anchor && anchor.href) {
+      e.preventDefault();
+      e.stopPropagation();
+      setPendingLink(anchor.href);
+    }
+  };
+
+  const confirmOpenLink = () => {
+    if (pendingLink) {
+      window.open(pendingLink, '_blank', 'noopener,noreferrer');
+      setPendingLink(null);
+    }
+  };
+
+  const cancelOpenLink = () => {
+    setPendingLink(null);
   };
 
   const getInitial = (name: string) => name.charAt(0).toUpperCase();
@@ -326,8 +349,9 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
 
                       {/* Message Content */}
                       <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 text-slate-300 text-sm leading-relaxed">
-                        <div 
-                          className="prose prose-invert max-w-none"
+                        <div
+                          className="prose prose-invert max-w-none [&_a]:text-blue-400 [&_a]:underline [&_a]:cursor-pointer [&_a:hover]:text-blue-300 [&_a]:pointer-events-auto [&_a]:relative [&_a]:z-10"
+                          onClick={handleBodyClick}
                           dangerouslySetInnerHTML={{ __html: currentMessage.body || currentMessage.snippet }}
                         />
                         
@@ -341,6 +365,46 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* リンク確認ダイアログ */}
+      {pendingLink && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="bg-[#1e293b] rounded-xl shadow-2xl w-full max-w-md border border-slate-700 animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-slate-700">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <ExternalLink className="w-5 h-5 text-amber-400" />
+                外部リンクを開きますか？
+              </h3>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-300 text-sm mb-4">
+                以下のリンクを新しいタブで開こうとしています。信頼できるリンクか確認してください。
+              </p>
+              <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 mb-4 break-all">
+                <p className="text-blue-400 text-sm font-mono">{pendingLink}</p>
+              </div>
+              <p className="text-amber-400 text-xs">
+                ⚠️ 不審なリンクの場合はキャンセルしてください
+              </p>
+            </div>
+            <div className="p-4 bg-slate-800/50 rounded-b-xl flex justify-end gap-3">
+              <button
+                onClick={cancelOpenLink}
+                className="px-4 py-2 text-slate-300 text-sm font-medium rounded-lg hover:bg-slate-700 transition-colors"
+              >
+                キャンセル
+              </button>
+              <button
+                onClick={confirmOpenLink}
+                className="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-500 transition-colors flex items-center gap-2"
+              >
+                <ExternalLink className="w-4 h-4" />
+                開く
+              </button>
+            </div>
           </div>
         </div>
       )}

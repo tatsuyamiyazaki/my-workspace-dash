@@ -79,9 +79,14 @@ const convertTextToHtml = (text: string): string => {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
+  // URLをリンクに変換
+  // 注意: エスケープ後の文字列に対して処理するため、&amp;などを考慮
+  const urlPattern = /(https?:\/\/[^\s<>"']+)/g;
+  const withLinks = escaped.replace(urlPattern, '<a href="$1">$1</a>');
+
   // あらゆる改行コードをHTMLの<br>タグに変換
   // 重要：\r\nを最初に処理して、\rと\nの重複処理を防ぐ
-  return escaped
+  return withLinks
     .replace(/\r\n/g, '<br>')
     .replace(/\r/g, '<br>')
     .replace(/\n/g, '<br>');
