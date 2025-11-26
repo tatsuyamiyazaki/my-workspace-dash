@@ -40,7 +40,7 @@ const NotesWidget = () => {
   const handleAddNote = async () => {
     if (!user || !newNoteContent.trim()) return;
     
-    await createNote(user.uid, newNoteContent.trim(), 'bg-white');
+    await createNote(user.uid, newNoteContent.trim());
     setNewNoteContent('');
   };
 
