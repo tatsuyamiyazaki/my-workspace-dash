@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Note } from '@/lib/constants';
 import { Plus, Edit, Trash2, LayoutGrid, LayoutList } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { subscribeNotes, createNote, updateNote, deleteNote } from '@/lib/notesAPI';
 
 type ViewMode = 'list' | 'grid';
 
 const NotesWidget = () => {
-  const [notes, setNotes] = useState<Note[]>(() => {
-    const storedNotes = localStorage.getItem('dashboardNotes');
-    return storedNotes ? JSON.parse(storedNotes) : [];
-  });
+  const { user } = useAuth();
+  const [notes, setNotes] = useState<Note[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     if (typeof window !== 'undefined') {
       const storedMode = localStorage.getItem('notesViewMode');
@@ -21,30 +21,32 @@ const NotesWidget = () => {
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingNoteContent, setEditingNoteContent] = useState('');
 
-  // Save notes to local storage whenever they change
+  // Subscribe to notes from Firestore
   useEffect(() => {
-    localStorage.setItem('dashboardNotes', JSON.stringify(notes));
-  }, [notes]);
+    if (!user) return;
+
+    const unsubscribe = subscribeNotes(user.uid, (updatedNotes) => {
+      setNotes(updatedNotes);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
 
   // Save viewMode to local storage
   useEffect(() => {
     localStorage.setItem('notesViewMode', viewMode);
   }, [viewMode]);
 
-  const handleAddNote = () => {
-    if (newNoteContent.trim()) {
-      const newNote: Note = {
-        id: Date.now().toString(),
-        content: newNoteContent.trim(),
-        createdAt: new Date().toISOString(),
-      };
-      setNotes([...notes, newNote]);
-      setNewNoteContent('');
-    }
+  const handleAddNote = async () => {
+    if (!user || !newNoteContent.trim()) return;
+    
+    await createNote(user.uid, newNoteContent.trim());
+    setNewNoteContent('');
   };
 
-  const handleDeleteNote = (id: string) => {
-    setNotes(notes.filter(note => note.id !== id));
+  const handleDeleteNote = async (id: string) => {
+    if (!user) return;
+    await deleteNote(user.uid, id);
   };
 
   const handleEditNote = (note: Note) => {
@@ -52,10 +54,10 @@ const NotesWidget = () => {
     setEditingNoteContent(note.content);
   };
 
-  const handleSaveEdit = (id: string) => {
-    setNotes(notes.map(note =>
-      note.id === id ? { ...note, content: editingNoteContent.trim() } : note
-    ));
+  const handleSaveEdit = async (id: string) => {
+    if (!user || !editingNoteContent.trim()) return;
+    
+    await updateNote(user.uid, id, editingNoteContent.trim());
     setEditingNoteId(null);
     setEditingNoteContent('');
   };

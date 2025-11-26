@@ -49,7 +49,9 @@ import {
 export interface Note {
   id: string;
   content: string;
-  createdAt: string;
+  color: string; // 背景色用 (例: 'bg-yellow-100')
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export const ICON_OPTIONS = [
