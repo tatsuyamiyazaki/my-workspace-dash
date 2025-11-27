@@ -4,6 +4,7 @@ export interface CalendarEvent {
   id: string;
   summary: string;
   description?: string;
+  location?: string;
   start: {
     dateTime?: string;
     date?: string; // 終日イベント用
@@ -16,6 +17,21 @@ export interface CalendarEvent {
   recurrence?: string[];
   recurringEventId?: string;
   colorId?: string;
+  conferenceData?: {
+    entryPoints?: {
+      entryPointType: string;
+      uri: string;
+      label?: string;
+    }[];
+    conferenceSolution?: {
+      key: {
+        type: string;
+      };
+      name: string;
+      iconUri?: string;
+    };
+    conferenceId?: string;
+  };
 }
 
 /**
@@ -31,6 +47,7 @@ export const fetchEvents = async (
     timeMax: timeMax.toISOString(),
     singleEvents: 'true',
     orderBy: 'startTime',
+    conferenceDataVersion: '1',
   });
 
   try {
@@ -58,9 +75,13 @@ export const fetchEvents = async (
 };
 
 export const getEvent = async (accessToken: string, eventId: string): Promise<CalendarEvent> => {
+  const params = new URLSearchParams({
+    conferenceDataVersion: '1',
+  });
+
   try {
     const res = await fetch(
-      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}`,
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events/${eventId}?${params.toString()}`,
       {
         headers: {
           Authorization: `Bearer ${accessToken}`,
@@ -85,6 +106,7 @@ export const createEvent = async (accessToken: string, event: Partial<CalendarEv
   interface CreateEventBody {
     summary?: string;
     description?: string;
+    location?: string;
     start?: { dateTime?: string; date?: string; };
     end?: { dateTime?: string; date?: string; };
     recurrence?: string[];
@@ -94,6 +116,7 @@ export const createEvent = async (accessToken: string, event: Partial<CalendarEv
   const body: CreateEventBody = {
     summary: event.summary,
     description: event.description,
+    location: event.location,
     start: event.start,
     end: event.end,
     recurrence: event.recurrence,
@@ -153,6 +176,7 @@ export const updateEvent = async (accessToken: string, eventId: string, event: P
   interface UpdateEventBody {
     summary?: string;
     description?: string;
+    location?: string;
     colorId?: string;
     recurrence?: string[];
     start?: { dateTime?: string; date?: string; };
@@ -163,6 +187,7 @@ export const updateEvent = async (accessToken: string, eventId: string, event: P
   const body: UpdateEventBody = {
     summary: event.summary,
     description: event.description,
+    location: event.location,
     colorId: event.colorId,
   };
 

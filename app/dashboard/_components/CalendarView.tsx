@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { ChevronLeft, ChevronRight, X, Plus, Maximize2, Minimize2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X, Plus, Maximize2, Minimize2, Video } from 'lucide-react';
 import { 
   format, 
   addMonths, 
@@ -67,6 +67,40 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const timelineRef = useRef<HTMLDivElement>(null);
+
+  const extractConferenceLink = (event: CalendarEvent): { url: string, type: 'google_meet' | 'teams' | 'zoom' | 'other', iconUri?: string, name?: string } | null => {
+    // 1. Check conferenceData (Structure data from Google/Add-ons)
+    if (event.conferenceData && event.conferenceData.entryPoints) {
+      const videoEntryPoint = event.conferenceData.entryPoints.find(ep => ep.entryPointType === 'video');
+      if (videoEntryPoint) {
+        const solution = event.conferenceData.conferenceSolution;
+        return {
+          url: videoEntryPoint.uri,
+          type: 'other', // We can refine this if needed, but iconUri is the key
+          iconUri: solution?.iconUri,
+          name: solution?.name
+        };
+      }
+    }
+
+    // 2. Fallback to Regex search in location/description
+    const textToSearch = `${event.location || ''} ${event.description || ''}`;
+    
+    const patterns = [
+      { regex: /https:\/\/teams\.microsoft\.com\/l\/meetup-join\/[^>\s"]+/, type: 'teams' as const },
+      { regex: /https:\/\/[a-z0-9-]+\.zoom\.us\/j\/[^>\s"]+/, type: 'zoom' as const },
+      { regex: /https:\/\/meet\.google\.com\/[a-z-]+/, type: 'google_meet' as const }
+    ];
+
+    for (const { regex, type } of patterns) {
+      const match = textToSearch.match(regex);
+      if (match) {
+        return { url: match[0], type };
+      }
+    }
+    
+    return null;
+  };
 
   // loadEventsをuseCallbackでメモ化する
   const loadEvents = useCallback(async () => {
@@ -179,6 +213,7 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
       id: '', // Empty ID marks it as new
       summary: '',
       description: '',
+      location: '',
       start: { dateTime: start.toISOString() },
       end: { dateTime: end.toISOString() },
       htmlLink: '',
@@ -250,6 +285,7 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
       id: '',
       summary: '',
       description: '',
+      location: '',
       start: { dateTime: startDate.toISOString() },
       end: { dateTime: endDate.toISOString() },
       htmlLink: '',
@@ -547,24 +583,43 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
                       
                       const top = (minutesFromStart / 60) * HOUR_HEIGHT;
                       const height = (durationMinutes / 60) * HOUR_HEIGHT;
+                      
+                      const conferenceData = extractConferenceLink(event);
 
                       return (
                         <div
                           key={event.id}
                           onClick={(e) => handleEventClick(event, e)}
-                          className="absolute inset-x-1 rounded bg-blue-100 dark:bg-blue-900/60 border-l-4 border-blue-500 p-1 overflow-hidden cursor-pointer hover:opacity-90 z-10 text-xs shadow-sm"
+                          className="absolute inset-x-1 rounded bg-blue-100 dark:bg-blue-900/60 border-l-4 border-blue-500 p-1 overflow-hidden cursor-pointer hover:opacity-90 z-10 text-xs shadow-sm group"
                           style={{
                             top: `${top}px`,
                             height: `${Math.max(24, height)}px`,
                           }}
                           title={`${event.summary} (${format(start, 'HH:mm')} - ${format(end, 'HH:mm')})`}
                         >
-                          <div className="font-bold text-blue-700 dark:text-blue-100 truncate">
-                            {event.summary}
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="font-bold text-blue-700 dark:text-blue-100 truncate flex-1">
+                              {event.summary}
+                            </div>
+                            {conferenceData && (
+                              <div className="flex-shrink-0" title={conferenceData.name || 'Web会議'}>
+                                {conferenceData.iconUri ? (
+                                  /* eslint-disable-next-line @next/next/no-img-element */
+                                  <img src={conferenceData.iconUri} alt="Conference" className="w-3.5 h-3.5" />
+                                ) : (
+                                  <Video className="w-3.5 h-3.5 text-blue-600 dark:text-blue-300" />
+                                )}
+                              </div>
+                            )}
                           </div>
                           <div className="text-blue-600 dark:text-blue-300 truncate text-[10px]">
                             {format(start, 'HH:mm')} - {format(end, 'HH:mm')}
                           </div>
+                          {event.location && (
+                            <div className="text-blue-500 dark:text-blue-400 truncate text-[9px] mt-0.5">
+                              {event.location}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -667,6 +722,30 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
               </div>
               
               <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                {/* Conference Link Button if exists */}
+                {(() => {
+                  const conferenceData = extractConferenceLink(editingEvent);
+                  if (conferenceData) {
+                    return (
+                      <a 
+                        href={conferenceData.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors shadow-sm mb-4"
+                      >
+                        {conferenceData.iconUri ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
+                          <img src={conferenceData.iconUri} alt="Conference" className="w-5 h-5 bg-white rounded-full p-0.5" />
+                        ) : (
+                          <Video className="w-5 h-5" />
+                        )}
+                        <span>{conferenceData.name ? `${conferenceData.name}に参加する` : 'Web会議に参加する'}</span>
+                      </a>
+                    );
+                  }
+                  return null;
+                })()}
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">タイトル</label>
                   <input
@@ -764,6 +843,18 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
                     }
                     return null;
                   })()}
+                </div>
+                
+                {/* Location */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">場所</label>
+                  <input
+                    type="text"
+                    value={editingEvent.location || ''}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="場所を追加"
+                  />
                 </div>
 
                 {/* Color Picker */}
