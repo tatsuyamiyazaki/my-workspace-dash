@@ -85,8 +85,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return newAccessToken;
       }
       return null;
-    } catch (error: any) {
-      if (error.code === 'auth/popup-blocked') {
+    } catch (error: unknown) {
+      if (error instanceof Error && 'code' in error && error.code === 'auth/popup-blocked') {
         console.warn('Token refresh failed: Popup was blocked. User interaction is required to refresh the token.');
       } else {
         console.error('Failed to refresh access token:', error);
@@ -115,9 +115,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // ユーザー操作（ボタンクリックなど）のタイミングでrefreshAccessTokenを呼び出す必要があります。
   useEffect(() => {
     // クリーンアップのみ行う
+    const timerId = refreshTimerRef.current;
     return () => {
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current);
+      if (timerId) {
+        clearTimeout(timerId);
       }
     };
   }, []);

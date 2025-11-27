@@ -230,38 +230,38 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
       {/* Thread Detail Modal */}
       {(selectedThread || loadingThread) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className={`bg-[#1e293b] rounded-xl shadow-2xl w-full flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-slate-700 transition-all ${
+          <div className={`bg-white dark:bg-[#1e293b] rounded-xl shadow-2xl w-full flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-gray-200 dark:border-slate-700 transition-all ${
             isMaximized ? 'max-w-none max-h-none h-full m-0' : 'max-w-3xl max-h-[85vh]'
           }`}>
             
             {loadingThread ? (
-              <div className="p-12 flex flex-col items-center justify-center text-white">
+              <div className="p-12 flex flex-col items-center justify-center text-gray-900 dark:text-white">
                 <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
                 <p>スレッドを読み込み中...</p>
               </div>
             ) : currentMessage && (
               <>
                 {/* Header */}
-                <div className="p-6 border-b border-slate-700 flex items-start justify-between bg-[#1e293b]">
+                <div className="p-6 border-b border-gray-200 dark:border-slate-700 flex items-start justify-between bg-white dark:bg-[#1e293b]">
                   <div className="flex-1 min-w-0 mr-8">
-                    <h3 className="text-xl font-bold text-white leading-snug">
+                    <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-snug">
                       {currentMessage.headers.subject}
                       {selectedThread!.length > 1 && (
-                        <span className="ml-3 text-base font-normal text-slate-400">({selectedThread!.length}件)</span>
+                        <span className="ml-3 text-base font-normal text-gray-500 dark:text-slate-400">({selectedThread!.length}件)</span>
                       )}
                     </h3>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => setIsMaximized(!isMaximized)}
-                      className="text-slate-400 hover:text-white transition-colors"
+                      className="text-gray-400 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors"
                       title={isMaximized ? '元のサイズに戻す' : '最大化'}
                     >
                       {isMaximized ? <Minimize2 className="w-5 h-5" /> : <Maximize2 className="w-5 h-5" />}
                     </button>
                     <button
                       onClick={closeModal}
-                      className="text-slate-400 hover:text-white transition-colors"
+                      className="text-gray-400 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white transition-colors"
                     >
                       <X className="w-6 h-6" />
                     </button>
@@ -298,26 +298,26 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto p-6 bg-[#0f172a]">
+                <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-[#0f172a]">
                   <div className="flex gap-4">
                     {/* Left Accent Line */}
                     <div className="w-1 bg-blue-500 rounded-full flex-shrink-0 self-stretch min-h-[200px]"></div>
-                    
+
                     <div className="flex-1 min-w-0">
                       {/* Message Meta */}
                       <div className="flex items-start justify-between mb-6">
                         <div className="space-y-3">
                           <div className="flex items-center gap-3">
-                            <User className="w-5 h-5 text-purple-400" />
-                            <span className="text-lg font-bold text-white">
+                            <User className="w-5 h-5 text-purple-500 dark:text-purple-400" />
+                            <span className="text-lg font-bold text-gray-900 dark:text-white">
                               {getSenderName(currentMessage.headers.from)}
                             </span>
                           </div>
-                          <div className="flex items-center gap-3 text-slate-400 text-sm">
+                          <div className="flex items-center gap-3 text-gray-500 dark:text-slate-400 text-sm">
                             <span className="font-medium">宛先:</span>
                             <span className="truncate max-w-[300px]">{currentMessage.headers.to}</span>
                           </div>
-                          <div className="flex items-center gap-3 text-slate-400 text-sm">
+                          <div className="flex items-center gap-3 text-gray-500 dark:text-slate-400 text-sm">
                             <Clock className="w-4 h-4" />
                             <span>{formatFullDate(currentMessage.headers.date)}</span>
                           </div>
@@ -326,20 +326,20 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
                         {/* Pagination Badge */}
                         {selectedThread!.length > 1 && (
                           <div className="flex items-center gap-2">
-                            <button 
+                            <button
                               disabled={currentThreadIndex === 0}
                               onClick={() => setCurrentThreadIndex(prev => prev - 1)}
-                              className="p-1 text-slate-400 hover:text-white disabled:opacity-30"
+                              className="p-1 text-gray-400 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-30"
                             >
                               ←
                             </button>
-                            <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 text-sm font-bold rounded-full border border-indigo-500/30">
+                            <span className="px-3 py-1 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-300 text-sm font-bold rounded-full border border-indigo-200 dark:border-indigo-500/30">
                               {currentThreadIndex + 1}/{selectedThread!.length}
                             </span>
-                            <button 
+                            <button
                               disabled={currentThreadIndex === selectedThread!.length - 1}
                               onClick={() => setCurrentThreadIndex(prev => prev + 1)}
-                              className="p-1 text-slate-400 hover:text-white disabled:opacity-30"
+                              className="p-1 text-gray-400 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white disabled:opacity-30"
                             >
                               →
                             </button>
@@ -348,14 +348,14 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
                       </div>
 
                       {/* Message Content */}
-                      <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 text-slate-300 text-sm leading-relaxed">
+                      <div className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl p-6 text-gray-700 dark:text-slate-300 text-sm leading-relaxed">
                         <div
-                          className="prose prose-invert max-w-none [&_a]:text-blue-400 [&_a]:underline [&_a]:cursor-pointer [&_a:hover]:text-blue-300 [&_a]:pointer-events-auto [&_a]:relative [&_a]:z-10"
+                          className="prose dark:prose-invert max-w-none [&_a]:text-blue-600 dark:[&_a]:text-blue-400 [&_a]:underline [&_a]:cursor-pointer [&_a:hover]:text-blue-500 dark:[&_a:hover]:text-blue-300 [&_a]:pointer-events-auto [&_a]:relative [&_a]:z-10"
                           onClick={handleBodyClick}
                           dangerouslySetInnerHTML={{ __html: currentMessage.body || currentMessage.snippet }}
                         />
-                        
-                        <div className="mt-8 pt-6 border-t border-slate-700 text-slate-500 text-xs">
+
+                        <div className="mt-8 pt-6 border-t border-gray-200 dark:border-slate-700 text-gray-400 dark:text-slate-500 text-xs">
                           <p>From: {currentMessage.headers.from}</p>
                           <p>Date: {currentMessage.headers.date}</p>
                         </div>
@@ -372,28 +372,28 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
       {/* リンク確認ダイアログ */}
       {pendingLink && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#1e293b] rounded-xl shadow-2xl w-full max-w-md border border-slate-700 animate-in fade-in zoom-in duration-200">
-            <div className="p-6 border-b border-slate-700">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <ExternalLink className="w-5 h-5 text-amber-400" />
+          <div className="bg-white dark:bg-[#1e293b] rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-slate-700 animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b border-gray-200 dark:border-slate-700">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <ExternalLink className="w-5 h-5 text-amber-500 dark:text-amber-400" />
                 外部リンクを開きますか？
               </h3>
             </div>
             <div className="p-6">
-              <p className="text-slate-300 text-sm mb-4">
+              <p className="text-gray-600 dark:text-slate-300 text-sm mb-4">
                 以下のリンクを新しいタブで開こうとしています。信頼できるリンクか確認してください。
               </p>
-              <div className="bg-slate-800 border border-slate-600 rounded-lg p-3 mb-4 break-all">
-                <p className="text-blue-400 text-sm font-mono">{pendingLink}</p>
+              <div className="bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg p-3 mb-4 break-all">
+                <p className="text-blue-600 dark:text-blue-400 text-sm font-mono">{pendingLink}</p>
               </div>
-              <p className="text-amber-400 text-xs">
+              <p className="text-amber-600 dark:text-amber-400 text-xs">
                 ⚠️ 不審なリンクの場合はキャンセルしてください
               </p>
             </div>
-            <div className="p-4 bg-slate-800/50 rounded-b-xl flex justify-end gap-3">
+            <div className="p-4 bg-gray-50 dark:bg-slate-800/50 rounded-b-xl flex justify-end gap-3">
               <button
                 onClick={cancelOpenLink}
-                className="px-4 py-2 text-slate-300 text-sm font-medium rounded-lg hover:bg-slate-700 transition-colors"
+                className="px-4 py-2 text-gray-600 dark:text-slate-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
               >
                 キャンセル
               </button>
