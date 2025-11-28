@@ -213,6 +213,8 @@ interface SettingsContextType {
   setCustomLinks: (links: CustomLink[]) => void;
   folders: LinkFolder[];
   setFolders: (folders: LinkFolder[]) => void;
+  noteGridColumns: number; // メモのグリッド列数
+  setNoteGridColumns: (columns: number) => void;
 }
 
 const SettingsContext = createContext<SettingsContextType>({
@@ -228,6 +230,8 @@ const SettingsContext = createContext<SettingsContextType>({
   setCustomLinks: () => { },
   folders: [],
   setFolders: () => { },
+  noteGridColumns: 2,
+  setNoteGridColumns: () => { },
 });
 
 export const SettingsProvider = ({ children }: { children: ReactNode }) => {
@@ -248,6 +252,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
         notificationMinutes: localNotifTime ? JSON.parse(localNotifTime) : [5, 15],
         notificationsEnabled: localNotifEnabled === 'true',
         fixedLinks: localFixed ? JSON.parse(localFixed) : DEFAULT_FIXED_LINKS,
+        noteGridColumns: 2,
       },
       customLinks: localCustom ? JSON.parse(localCustom) : [],
       folders: localFolders ? JSON.parse(localFolders) : [],
@@ -266,12 +271,13 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     const userDocRef = doc(db, 'users', user.uid);
 
     // setting配下のデータか、ルート直下のデータ (customLinks or folders) かで分岐
-    if (['refreshInterval', 'notificationMinutes', 'notificationsEnabled', 'fixedLinks'].includes(key)) {
+    if (['refreshInterval', 'notificationMinutes', 'notificationsEnabled', 'fixedLinks', 'noteGridColumns'].includes(key)) {
       // Type guard for settings properties
       if (key === 'refreshInterval' && typeof value !== 'number') return;
       if (key === 'notificationMinutes' && (!Array.isArray(value) || !value.every(item => typeof item === 'number'))) return;
       if (key === 'notificationsEnabled' && typeof value !== 'boolean') return;
       if (key === 'fixedLinks' && (!Array.isArray(value) || !value.every((item: FixedLink) => typeof item === 'object' && 'id' in item && 'name' in item && 'url' in item && 'icon' in item))) return;
+      if (key === 'noteGridColumns' && typeof value !== 'number') return;
 
       await setDoc(userDocRef, { settings: { [key]: value } }, { merge: true });
     } else {
@@ -290,6 +296,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   const [fixedLinks, setFixedLinksState] = useState<FixedLink[]>(DEFAULT_FIXED_LINKS);
   const [customLinks, setCustomLinksState] = useState<CustomLink[]>([]);
   const [folders, setFoldersState] = useState<LinkFolder[]>([]);
+  const [noteGridColumns, setNoteGridColumnsState] = useState(2);
 
   // Firestoreとの同期処理
   useEffect(() => {
@@ -307,6 +314,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
           setNotificationMinutesState(data.settings.notificationMinutes ?? [5, 15]);
           setNotificationsEnabledState(data.settings.notificationsEnabled ?? false);
           setFixedLinksState(data.settings.fixedLinks ?? DEFAULT_FIXED_LINKS);
+          setNoteGridColumnsState(data.settings.noteGridColumns ?? 2);
         }
         setCustomLinksState(data.customLinks ?? []);
         setFoldersState(data.folders ?? []);
@@ -344,6 +352,10 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     setFoldersState(val);
     saveToFirestore('folders', val);
   };
+  const setNoteGridColumns = (val: number) => {
+    setNoteGridColumnsState(val);
+    saveToFirestore('noteGridColumns', val);
+  };
 
   return (
     <SettingsContext.Provider value={{
@@ -353,6 +365,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
       fixedLinks, setFixedLinks,
       customLinks, setCustomLinks,
       folders, setFolders,
+      noteGridColumns, setNoteGridColumns,
     }}>
       {children}
     </SettingsContext.Provider>

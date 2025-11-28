@@ -50,9 +50,21 @@ export interface Note {
   id: string;
   content: string;
   color: string; // 背景色用 (例: 'bg-yellow-100')
+  tags: string[]; // タグのリスト
   createdAt: Date;
   updatedAt: Date;
 }
+
+// メモの色オプション
+export const NOTE_COLORS = [
+  { name: 'デフォルト', value: 'bg-gray-50 dark:bg-slate-700', border: 'border-gray-200 dark:border-slate-600' },
+  { name: '黄色', value: 'bg-yellow-100 dark:bg-yellow-900/30', border: 'border-yellow-300 dark:border-yellow-700' },
+  { name: '緑', value: 'bg-green-100 dark:bg-green-900/30', border: 'border-green-300 dark:border-green-700' },
+  { name: '青', value: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-300 dark:border-blue-700' },
+  { name: 'ピンク', value: 'bg-pink-100 dark:bg-pink-900/30', border: 'border-pink-300 dark:border-pink-700' },
+  { name: '紫', value: 'bg-purple-100 dark:bg-purple-900/30', border: 'border-purple-300 dark:border-purple-700' },
+  { name: 'オレンジ', value: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-300 dark:border-orange-700' },
+];
 
 export const ICON_OPTIONS = [
   // Original icons

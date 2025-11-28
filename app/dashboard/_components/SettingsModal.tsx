@@ -1,6 +1,6 @@
 'use client';
 
-import { X, Plus, Trash2, Bell, Edit2, Link as LinkIcon } from 'lucide-react';
+import { X, Plus, Trash2, Bell, Edit2, Link as LinkIcon, LayoutGrid } from 'lucide-react';
 import { useSettings, FixedLink } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { ICON_OPTIONS } from '@/lib/constants';
@@ -13,8 +13,8 @@ interface SettingsModalProps {
 const PRESET_TIMES = [1, 5, 10, 15, 30, 60];
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  const { 
-    refreshInterval, 
+  const {
+    refreshInterval,
     setRefreshInterval,
     notificationMinutes,
     setNotificationMinutes,
@@ -22,6 +22,8 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setNotificationsEnabled,
     fixedLinks,
     setFixedLinks,
+    noteGridColumns,
+    setNoteGridColumns,
   } = useSettings();
   const [tempInterval, setTempInterval] = useState(() => refreshInterval);
   const [tempNotifications, setTempNotifications] = useState<number[]>(() => notificationMinutes);
@@ -29,6 +31,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [newNotificationTime, setNewNotificationTime] = useState<number>(5);
   const [tempFixedLinks, setTempFixedLinks] = useState<FixedLink[]>(() => fixedLinks);
   const [editingLink, setEditingLink] = useState<FixedLink | null>(null);
+  const [tempNoteGridColumns, setTempNoteGridColumns] = useState(() => noteGridColumns);
 
   useEffect(() => {
     if (isOpen) {
@@ -38,9 +41,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         setTempNotifications(notificationMinutes);
         setTempEnabled(notificationsEnabled);
         setTempFixedLinks(fixedLinks);
+        setTempNoteGridColumns(noteGridColumns);
       }, 0);
     }
-  }, [refreshInterval, notificationMinutes, notificationsEnabled, fixedLinks, isOpen]);
+  }, [refreshInterval, notificationMinutes, notificationsEnabled, fixedLinks, noteGridColumns, isOpen]);
 
   // Escキー対応
   useEffect(() => {
@@ -67,6 +71,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setNotificationMinutes(tempNotifications);
     setNotificationsEnabled(tempEnabled);
     setFixedLinks(tempFixedLinks);
+    setNoteGridColumns(tempNoteGridColumns);
 
     // Request notification permission if enabling
     if (tempEnabled && !notificationsEnabled) {
@@ -290,6 +295,34 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   固定リンクはありません
                 </p>
               )}
+            </div>
+          </div>
+
+          {/* Note Grid Columns Section */}
+          <div className="border-t border-gray-200 dark:border-slate-700 pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <LayoutGrid className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                メモのカード表示列数
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              グリッド表示時のメモカードの列数を設定します
+            </p>
+            <div className="flex gap-2">
+              {[1, 2, 3, 4].map((cols) => (
+                <button
+                  key={cols}
+                  onClick={() => setTempNoteGridColumns(cols)}
+                  className={`flex-1 py-2 px-3 text-sm font-medium rounded-lg border-2 transition-colors ${
+                    tempNoteGridColumns === cols
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                      : 'border-gray-200 dark:border-slate-600 hover:border-blue-300 dark:hover:border-blue-700 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  {cols}列
+                </button>
+              ))}
             </div>
           </div>
         </div>

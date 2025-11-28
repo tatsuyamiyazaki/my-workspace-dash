@@ -9,6 +9,7 @@ export interface Note {
   id: string;
   content: string;
   color: string; // 背景色用 (例: 'bg-yellow-100')
+  tags: string[]; // タグのリスト
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,6 +28,7 @@ export const subscribeNotes = (uid: string, onUpdate: (notes: Note[]) => void) =
         id: doc.id,
         content: data.content,
         color: data.color || 'bg-white',
+        tags: data.tags || [],
         createdAt: data.createdAt?.toDate() || new Date(),
         updatedAt: data.updatedAt?.toDate() || new Date(),
       } as Note;
@@ -36,21 +38,23 @@ export const subscribeNotes = (uid: string, onUpdate: (notes: Note[]) => void) =
 };
 
 // メモの作成
-export const createNote = async (uid: string, content: string, color: string = 'bg-white') => {
+export const createNote = async (uid: string, content: string, color: string = 'bg-white', tags: string[] = []) => {
   await addDoc(collection(db, "users", uid, "notes"), {
     content,
     color,
+    tags,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
 };
 
 // メモの更新
-export const updateNote = async (uid: string, noteId: string, content: string, color?: string) => {
+export const updateNote = async (uid: string, noteId: string, content: string, color?: string, tags?: string[]) => {
   interface NoteUpdateData {
     content: string;
     updatedAt: FieldValue;
     color?: string;
+    tags?: string[];
   }
 
   const data: NoteUpdateData = {
@@ -58,6 +62,7 @@ export const updateNote = async (uid: string, noteId: string, content: string, c
     updatedAt: serverTimestamp(),
   };
   if (color) data.color = color;
+  if (tags) data.tags = tags;
   
   const noteRef = doc(db, "users", uid, "notes", noteId);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

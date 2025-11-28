@@ -184,9 +184,9 @@ export default function CustomLinkList() {
                     </div>
                   </div>
                   {folder.isExpanded && (
-                    <div className="ml-6 border-l-2 border-gray-200 dark:border-slate-700 pl-3 grid grid-cols-2 gap-2">
+                    <div className="ml-6 border-l-2 border-gray-200 dark:border-slate-700 pl-3 space-y-2">
                       {folderLinks.length === 0 ? (
-                        <div className="text-xs text-gray-400 py-2 col-span-2">リンクはありません</div>
+                        <div className="text-xs text-gray-400 py-2">リンクはありません</div>
                       ) : (
                         folderLinks.map((link) => {
                           const LinkIcon = getIconComponent(link.icon);
@@ -219,7 +219,7 @@ export default function CustomLinkList() {
 
             {/* Unorganized Links */}
             {unorganizedLinks.length > 0 && (
-              <div className="pt-2 border-t border-gray-200 dark:border-slate-700 grid grid-cols-2 gap-2">
+              <div className="pt-2 border-t border-gray-200 dark:border-slate-700 space-y-2">
                 {unorganizedLinks.map((link) => {
                   const LinkIcon = getIconComponent(link.icon);
                   return (

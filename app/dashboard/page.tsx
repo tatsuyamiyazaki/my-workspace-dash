@@ -156,11 +156,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Bottom Section: Links and Notes */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <div className="lg:col-span-1">
           <FixedLinkList />
         </div>
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-1">
           <CustomLinkList />
         </div>
         <div className="lg:col-span-2">
