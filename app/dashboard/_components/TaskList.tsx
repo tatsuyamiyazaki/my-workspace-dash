@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, Plus, X, Trash2, Filter } from 'lucide-react';
+import { Loader2, Plus, X, Trash2, Filter, ExternalLink } from 'lucide-react';
 import { fetchTasks, fetchTaskLists, createTask, updateTask, deleteTask, Task, TaskList as ITaskList } from '@/lib/tasksApi';
 import { useAuth } from '@/contexts/AuthContext';
 import { isToday, parseISO } from 'date-fns';
+import Link from 'next/link';
 
 interface TaskListProps {
   accessToken?: string | null;
@@ -168,7 +169,13 @@ export default function TaskList({ accessToken, refreshTrigger }: TaskListProps)
     <>
       <div className="bg-white dark:bg-[#1e293b] p-6 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-[480px] flex flex-col">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold text-gray-900 dark:text-white">未完了タスク</h2>
+          <Link
+            href="/dashboard/tasks"
+            className="text-lg font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2 group"
+          >
+            未完了タスク
+            <ExternalLink className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </Link>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowTodayOnly(!showTodayOnly)}
