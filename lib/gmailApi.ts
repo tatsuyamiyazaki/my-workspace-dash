@@ -39,6 +39,14 @@ interface GmailRawMessage {
   internalDate: string;
 }
 
+// 添付ファイル情報の型定義
+export interface EmailAttachment {
+  attachmentId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
 // メール1件分の型定義
 export interface EmailMessage {
   id: string;
@@ -46,6 +54,7 @@ export interface EmailMessage {
   snippet: string;
   body?: string; // 本文を追加
   labelIds?: string[]; // ラベルID (UNREAD, INBOX等)
+  attachments?: EmailAttachment[]; // 添付ファイル一覧
   headers: {
     subject: string;
     from: string;
@@ -132,17 +141,47 @@ const extractBody = (payload: GmailMessagePayload): string => {
   return decodedBody;
 };
 
+// ペイロードから添付ファイル情報を抽出する関数
+const extractAttachments = (payload: GmailMessagePayload, messageId: string): EmailAttachment[] => {
+  const attachments: EmailAttachment[] = [];
+
+  const findAttachments = (parts: GmailMessagePart[] | undefined) => {
+    if (!parts) return;
+
+    for (const part of parts) {
+      // 添付ファイルはattachmentIdを持ち、ファイル名がある
+      if (part.body?.attachmentId && part.filename) {
+        attachments.push({
+          attachmentId: part.body.attachmentId,
+          filename: part.filename,
+          mimeType: part.mimeType,
+          size: part.body.size || 0,
+        });
+      }
+      // ネストされたパーツを再帰的に探索
+      if (part.parts) {
+        findAttachments(part.parts);
+      }
+    }
+  };
+
+  findAttachments(payload.parts);
+
+  return attachments;
+};
+
 // Helper to format a single message
 const formatEmailMessage = (email: GmailRawMessage): EmailMessage => {
   const headers = email.payload.headers;
   const getHeader = (name: string) => headers.find((h: GmailMessageHeader) => h.name === name)?.value || "";
-  
+
   return {
     id: email.id,
     threadId: email.threadId,
     snippet: email.snippet,
     body: extractBody(email.payload),
     labelIds: email.labelIds || [],
+    attachments: extractAttachments(email.payload, email.id),
     headers: {
       subject: getHeader("Subject") || "(No Subject)",
       from: getHeader("From") || "(Unknown Sender)",
@@ -330,4 +369,53 @@ export const trashEmail = async (accessToken: string, messageId: string): Promis
     const errorBody = await res.text();
     throw new Error(`Failed to trash email: ${res.status} ${errorBody}`);
   }
+};
+
+/**
+ * 添付ファイルをダウンロードして開く関数
+ * @param accessToken アクセストークン
+ * @param messageId メッセージID
+ * @param attachmentId 添付ファイルID
+ * @param filename ファイル名
+ * @param mimeType MIMEタイプ
+ */
+export const downloadAndOpenAttachment = async (
+  accessToken: string,
+  messageId: string,
+  attachmentId: string,
+  filename: string,
+  mimeType: string
+): Promise<void> => {
+  const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`Failed to fetch attachment: ${res.status} ${errorBody}`);
+  }
+
+  const data = await res.json();
+
+  // Base64Url -> Base64 変換
+  const base64 = data.data.replace(/-/g, '+').replace(/_/g, '/');
+
+  // Base64をバイナリに変換
+  const byteCharacters = atob(base64);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+
+  // Blobを作成してダウンロードまたは開く
+  const blob = new Blob([byteArray], { type: mimeType });
+  const blobUrl = URL.createObjectURL(blob);
+
+  // 新しいタブで開く（プレビュー可能なファイルは表示、それ以外はダウンロード）
+  window.open(blobUrl, '_blank');
+
+  // URLを後でクリーンアップ
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
 };

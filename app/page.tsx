@@ -27,8 +27,20 @@ export default function LoginPage() {
         // ログイン成功したらダッシュボードへ遷移
         router.push('/dashboard');
       }
-    } catch (error) {
-      console.error("Login failed", error);
+    } catch (error: unknown) {
+      // ユーザーがポップアップを閉じた場合は正常な動作なのでエラーログを出さない
+      if (error instanceof Error && 'code' in error) {
+        const errorCode = (error as { code: string }).code;
+        if (errorCode === 'auth/popup-closed-by-user') {
+          console.debug('User closed the login popup');
+        } else if (errorCode === 'auth/popup-blocked') {
+          console.warn('Login popup was blocked by the browser');
+        } else {
+          console.error("Login failed", error);
+        }
+      } else {
+        console.error("Login failed", error);
+      }
     } finally {
       setIsLoading(false);
     }

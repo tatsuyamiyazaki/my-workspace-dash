@@ -1,8 +1,8 @@
-import { EmailMessage, fetchThread, markAsRead, archiveEmail, trashEmail } from '@/lib/gmailApi';
+import { EmailMessage, EmailAttachment, fetchThread, markAsRead, archiveEmail, trashEmail, downloadAndOpenAttachment } from '@/lib/gmailApi';
 import { format, isToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { useState, useEffect } from 'react';
-import { X, Reply, ExternalLink, User, Clock, Archive, Mail, MailOpen, Trash2, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Reply, ExternalLink, User, Clock, Archive, Mail, MailOpen, Trash2, Maximize2, Minimize2, Paperclip, FileText, FileImage, FileSpreadsheet, File } from 'lucide-react';
 
 interface MailListProps {
   emails: EmailMessage[];
@@ -150,6 +150,41 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
     return match ? match[1].trim() : from;
   };
 
+  // 添付ファイルのアイコンを取得
+  const getAttachmentIcon = (mimeType: string) => {
+    if (mimeType.startsWith('image/')) {
+      return <FileImage className="w-5 h-5" />;
+    } else if (mimeType.includes('spreadsheet') || mimeType.includes('excel') || mimeType === 'text/csv') {
+      return <FileSpreadsheet className="w-5 h-5" />;
+    } else if (mimeType.includes('pdf') || mimeType.includes('document') || mimeType.includes('word') || mimeType.startsWith('text/')) {
+      return <FileText className="w-5 h-5" />;
+    }
+    return <File className="w-5 h-5" />;
+  };
+
+  // 添付ファイルサイズをフォーマット
+  const formatFileSize = (bytes: number): string => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  // 添付ファイルをダブルクリックで開く
+  const handleAttachmentDoubleClick = async (messageId: string, attachment: EmailAttachment) => {
+    if (!accessToken) return;
+    try {
+      await downloadAndOpenAttachment(
+        accessToken,
+        messageId,
+        attachment.attachmentId,
+        attachment.filename,
+        attachment.mimeType
+      );
+    } catch (error) {
+      console.error('Failed to open attachment:', error);
+    }
+  };
+
   if (loading) {
     return (
       <div className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-[480px] flex flex-col overflow-hidden">
@@ -204,8 +239,8 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
               const color = getColor(initial);
               
               return (
-                <div 
-                  key={email.id} 
+                <div
+                  key={email.id}
                   className="flex items-start gap-4 group cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800/50 p-2 -mx-2 rounded-lg transition-colors"
                   onClick={() => handleEmailClick(email)}
                 >
@@ -215,11 +250,20 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
                       <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate">{senderName}</h3>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">{formatTime(email.headers.date)}</span>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {email.attachments && email.attachments.length > 0 && (
+                          <span title={`${email.attachments.length}件の添付ファイル`}>
+                            <Paperclip className="w-4 h-4 text-gray-400 dark:text-slate-500" />
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{formatTime(email.headers.date)}</span>
+                      </div>
                     </div>
                     <p className="text-sm text-gray-600 dark:text-gray-300 truncate">{email.headers.subject}</p>
                   </div>
-                  <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                  {email.labelIds?.includes('UNREAD') && (
+                    <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                  )}
                 </div>
               );
             })
@@ -354,6 +398,43 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
                           onClick={handleBodyClick}
                           dangerouslySetInnerHTML={{ __html: currentMessage.body || currentMessage.snippet }}
                         />
+
+                        {/* Attachments Section */}
+                        {currentMessage.attachments && currentMessage.attachments.length > 0 && (
+                          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-slate-700">
+                            <div className="flex items-center gap-2 mb-4">
+                              <Paperclip className="w-4 h-4 text-gray-500 dark:text-slate-400" />
+                              <span className="text-sm font-bold text-gray-700 dark:text-slate-300">
+                                添付ファイル ({currentMessage.attachments.length}件)
+                              </span>
+                            </div>
+                            <div className="grid gap-2">
+                              {currentMessage.attachments.map((attachment, idx) => (
+                                <div
+                                  key={`${attachment.attachmentId}-${idx}`}
+                                  onDoubleClick={() => handleAttachmentDoubleClick(currentMessage.id, attachment)}
+                                  className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors select-none"
+                                  title="ダブルクリックで開く"
+                                >
+                                  <div className="text-blue-500 dark:text-blue-400">
+                                    {getAttachmentIcon(attachment.mimeType)}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                      {attachment.filename}
+                                    </p>
+                                    <p className="text-xs text-gray-500 dark:text-slate-400">
+                                      {formatFileSize(attachment.size)}
+                                    </p>
+                                  </div>
+                                  <span className="text-xs text-gray-400 dark:text-slate-500 flex-shrink-0">
+                                    ダブルクリックで開く
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
 
                         <div className="mt-8 pt-6 border-t border-gray-200 dark:border-slate-700 text-gray-400 dark:text-slate-500 text-xs">
                           <p>From: {currentMessage.headers.from}</p>

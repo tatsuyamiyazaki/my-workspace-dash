@@ -86,8 +86,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
       return null;
     } catch (error: unknown) {
-      if (error instanceof Error && 'code' in error && error.code === 'auth/popup-blocked') {
-        console.warn('Token refresh failed: Popup was blocked. User interaction is required to refresh the token.');
+      if (error instanceof Error && 'code' in error) {
+        const errorCode = (error as { code: string }).code;
+        if (errorCode === 'auth/popup-blocked') {
+          console.warn('Token refresh failed: Popup was blocked. User interaction is required to refresh the token.');
+        } else if (errorCode === 'auth/popup-closed-by-user') {
+          // ユーザーがポップアップを閉じた場合は正常な動作なのでログを出さない
+          console.debug('User closed the login popup');
+        } else {
+          console.error('Failed to refresh access token:', error);
+        }
       } else {
         console.error('Failed to refresh access token:', error);
       }
