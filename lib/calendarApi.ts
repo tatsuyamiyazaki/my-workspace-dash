@@ -17,6 +17,9 @@ export interface CalendarEvent {
   recurrence?: string[];
   recurringEventId?: string;
   colorId?: string;
+  // Google Calendar APIから返される実際の色情報
+  backgroundColor?: string; // hex形式 (例: "#a4bdfc")
+  foregroundColor?: string; // hex形式 (例: "#1d1d1d")
   conferenceData?: {
     entryPoints?: {
       entryPointType: string;
@@ -32,6 +35,12 @@ export interface CalendarEvent {
     };
     conferenceId?: string;
   };
+}
+
+// Google Calendar Colors APIのレスポンス型
+export interface CalendarColors {
+  event: Record<string, { background: string; foreground: string }>;
+  calendar: Record<string, { background: string; foreground: string }>;
 }
 
 /**
@@ -263,4 +272,47 @@ export const fetchDashboardCalendarData = async (accessToken: string) => {
     todayEventCount: todayEvents.length,
     nextEvent: nextEvent || null,
   };
+};
+
+/**
+ * Google Calendar Colors APIから色定義を取得する
+ */
+export const fetchCalendarColors = async (accessToken: string): Promise<CalendarColors> => {
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/calendar/v3/colors`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!res.ok) {
+      const errorBody = await res.text();
+      console.error(`Calendar Colors API Error: ${res.status}`, errorBody);
+      throw new Error(`Failed to fetch calendar colors: ${res.status}`);
+    }
+
+    return await res.json();
+  } catch (error: unknown) {
+    console.error('Error in fetchCalendarColors:', error);
+    throw error instanceof Error ? error : new Error('Network error while fetching calendar colors');
+  }
+};
+
+// Google Calendar APIのイベント色定義（デフォルト値）
+// Colors APIから取得できない場合のフォールバック
+export const DEFAULT_EVENT_COLORS: Record<string, { background: string; foreground: string }> = {
+  '1': { background: '#a4bdfc', foreground: '#1d1d1d' },  // ラベンダー
+  '2': { background: '#7ae7bf', foreground: '#1d1d1d' },  // セージ
+  '3': { background: '#dbadff', foreground: '#1d1d1d' },  // グレープ
+  '4': { background: '#ff887c', foreground: '#1d1d1d' },  // フラミンゴ
+  '5': { background: '#fbd75b', foreground: '#1d1d1d' },  // バナナ
+  '6': { background: '#ffb878', foreground: '#1d1d1d' },  // ミカン
+  '7': { background: '#46d6db', foreground: '#1d1d1d' },  // ピーコック
+  '8': { background: '#e1e1e1', foreground: '#1d1d1d' },  // グラファイト
+  '9': { background: '#5484ed', foreground: '#ffffff' },  // ブルーベリー
+  '10': { background: '#51b749', foreground: '#1d1d1d' }, // バジル
+  '11': { background: '#dc2127', foreground: '#ffffff' }, // トマト
 };

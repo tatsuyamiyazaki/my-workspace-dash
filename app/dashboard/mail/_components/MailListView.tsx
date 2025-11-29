@@ -1,29 +1,24 @@
+'use client';
+
 import { EmailMessage, EmailAttachment, fetchThread, markAsRead, archiveEmail, trashEmail, downloadAndOpenAttachment } from '@/lib/gmailApi';
 import { format, isToday } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { X, Reply, ExternalLink, User, Clock, Archive, Mail, MailOpen, Trash2, Maximize2, Minimize2, Paperclip, FileText, FileImage, FileSpreadsheet, File, ChevronRight } from 'lucide-react';
+import { X, Reply, ExternalLink, User, Clock, Archive, Trash2, Maximize2, Minimize2, Paperclip, FileText, FileImage, FileSpreadsheet, File } from 'lucide-react';
 
-interface MailListProps {
+interface MailListViewProps {
   emails: EmailMessage[];
   loading?: boolean;
   accessToken?: string | null;
   onRefresh?: () => void;
 }
 
-export default function MailList({ emails, loading = false, accessToken, onRefresh }: MailListProps) {
-  const router = useRouter();
+export default function MailListView({ emails, loading = false, accessToken, onRefresh }: MailListViewProps) {
   const [selectedThread, setSelectedThread] = useState<EmailMessage[] | null>(null);
   const [currentThreadIndex, setCurrentThreadIndex] = useState(0);
   const [loadingThread, setLoadingThread] = useState(false);
-  const [showUnreadOnly, setShowUnreadOnly] = useState(true);
   const [isMaximized, setIsMaximized] = useState(false);
   const [pendingLink, setPendingLink] = useState<string | null>(null);
-
-  const handleOpenMailPage = () => {
-    router.push('/dashboard/mail');
-  };
 
   // Escキー対応
   useEffect(() => {
@@ -45,19 +40,15 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
 
   const handleEmailClick = async (email: EmailMessage) => {
     if (!accessToken) return;
-    
+
     try {
       setLoadingThread(true);
-      // スレッド全体を取得
       const threadMessages = await fetchThread(accessToken, email.threadId);
       setSelectedThread(threadMessages);
-      // 最新のメッセージ（通常は最後）を表示
       setCurrentThreadIndex(threadMessages.length - 1);
-      // 既読化（Gmail API）
       await markAsRead(accessToken, email.id);
     } catch (error) {
       console.error("Failed to fetch thread", error);
-      // フォールバック: 単一メッセージのみ表示
       setSelectedThread([email]);
       setCurrentThreadIndex(0);
     } finally {
@@ -93,7 +84,6 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
     }
   };
 
-  // メール本文内のリンククリックをハンドル
   const handleBodyClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
     const anchor = target.closest('a');
@@ -116,15 +106,15 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
   };
 
   const getInitial = (name: string) => name.charAt(0).toUpperCase();
-  
+
   const getColor = (initial: string) => {
     const colors = [
-      'bg-emerald-100 text-emerald-600',
-      'bg-blue-100 text-blue-600',
-      'bg-amber-100 text-amber-600',
-      'bg-purple-100 text-purple-600',
-      'bg-pink-100 text-pink-600',
-      'bg-indigo-100 text-indigo-600',
+      'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400',
+      'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+      'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400',
+      'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
+      'bg-pink-100 text-pink-600 dark:bg-pink-900/30 dark:text-pink-400',
+      'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
     ];
     const index = initial.charCodeAt(0) % colors.length;
     return colors[index];
@@ -150,13 +140,11 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
     }
   };
 
-  // Extract sender name from "Name <email@example.com>" format
   const getSenderName = (from: string) => {
     const match = from.match(/^"?([^"<]+)"?/);
     return match ? match[1].trim() : from;
   };
 
-  // 添付ファイルのアイコンを取得
   const getAttachmentIcon = (mimeType: string) => {
     if (mimeType.startsWith('image/')) {
       return <FileImage className="w-5 h-5" />;
@@ -168,14 +156,12 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
     return <File className="w-5 h-5" />;
   };
 
-  // 添付ファイルサイズをフォーマット
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
-  // 添付ファイルをダブルクリックで開く
   const handleAttachmentDoubleClick = async (messageId: string, attachment: EmailAttachment) => {
     if (!accessToken) return;
     try {
@@ -193,12 +179,11 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-[480px] flex flex-col overflow-hidden">
-        <h2 className="text-lg font-bold text-gray-900 dark:text-white p-6 pb-4 flex-shrink-0">メール一覧</h2>
-        <div className="px-6 pb-6 space-y-6 overflow-y-auto flex-1">
-          {[...Array(4)].map((_, i) => (
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 p-6">
+        <div className="space-y-4">
+          {[...Array(8)].map((_, i) => (
             <div key={i} className="flex items-start gap-4 animate-pulse">
-              <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-slate-700 flex-shrink-0" />
+              <div className="w-12 h-12 rounded-full bg-gray-200 dark:bg-slate-700 flex-shrink-0" />
               <div className="flex-1 space-y-2">
                 <div className="h-4 bg-gray-200 dark:bg-slate-700 rounded w-3/4" />
                 <div className="h-3 bg-gray-200 dark:bg-slate-700 rounded w-1/2" />
@@ -210,59 +195,38 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
     );
   }
 
-  // Filter emails based on unread status
-  const filteredEmails = showUnreadOnly 
-    ? emails.filter(email => email.labelIds?.includes('UNREAD'))
-    : emails;
-
   return (
     <>
-      <div className="bg-white dark:bg-[#1e293b] rounded-xl shadow-sm border border-gray-200 dark:border-slate-700 h-[480px] flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0">
-          <button
-            onClick={handleOpenMailPage}
-            className="flex items-center gap-2 text-lg font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors group"
-          >
-            メール一覧
-            <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
-          </button>
-          <button
-            onClick={() => setShowUnreadOnly(!showUnreadOnly)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              showUnreadOnly
-                ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
-                : 'bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600'
-            }`}
-            title={showUnreadOnly ? 'すべて表示' : '未読のみ表示'}
-          >
-            {showUnreadOnly ? <Mail className="w-4 h-4" /> : <MailOpen className="w-4 h-4" />}
-            {showUnreadOnly ? '未読のみ' : 'すべて'}
-          </button>
-        </div>
-        <div className="px-6 pb-6 space-y-6 overflow-y-auto flex-1">
-          {filteredEmails.length === 0 ? (
-            <p className="text-gray-500 dark:text-gray-400 text-sm">
-              {showUnreadOnly ? '未読メールはありません' : 'メールはありません'}
-            </p>
-          ) : (
-            filteredEmails.map((email) => {
+      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-200 dark:border-slate-700">
+        {emails.length === 0 ? (
+          <div className="p-12 text-center">
+            <p className="text-gray-500 dark:text-gray-400">メールはありません</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-100 dark:divide-slate-700">
+            {emails.map((email) => {
               const senderName = getSenderName(email.headers.from);
               const initial = getInitial(senderName);
               const color = getColor(initial);
-              
+              const isUnread = email.labelIds?.includes('UNREAD');
+
               return (
                 <div
                   key={email.id}
-                  className="flex items-start gap-4 group cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-800/50 p-2 -mx-2 rounded-lg transition-colors"
+                  className={`flex items-start gap-4 p-4 cursor-pointer hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors ${
+                    isUnread ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''
+                  }`}
                   onClick={() => handleEmailClick(email)}
                 >
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0 ${color}`}>
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0 ${color}`}>
                     {initial}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-1">
-                      <h3 className="text-sm font-bold text-gray-900 dark:text-white truncate">{senderName}</h3>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <h3 className={`text-sm truncate ${isUnread ? 'font-bold text-gray-900 dark:text-white' : 'font-medium text-gray-700 dark:text-gray-300'}`}>
+                        {senderName}
+                      </h3>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-4">
                         {email.attachments && email.attachments.length > 0 && (
                           <span title={`${email.attachments.length}件の添付ファイル`}>
                             <Paperclip className="w-4 h-4 text-gray-400 dark:text-slate-500" />
@@ -271,25 +235,30 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
                         <span className="text-xs text-gray-500 dark:text-gray-400">{formatTime(email.headers.date)}</span>
                       </div>
                     </div>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 truncate">{email.headers.subject}</p>
+                    <p className={`text-sm truncate ${isUnread ? 'text-gray-800 dark:text-gray-200' : 'text-gray-600 dark:text-gray-400'}`}>
+                      {email.headers.subject}
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate mt-1">
+                      {email.snippet}
+                    </p>
                   </div>
-                  {email.labelIds?.includes('UNREAD') && (
-                    <div className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></div>
+                  {isUnread && (
+                    <div className="w-2.5 h-2.5 bg-blue-500 rounded-full mt-5 flex-shrink-0"></div>
                   )}
                 </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
 
       {/* Thread Detail Modal */}
       {(selectedThread || loadingThread) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className={`bg-white dark:bg-[#1e293b] rounded-xl shadow-2xl w-full flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-gray-200 dark:border-slate-700 transition-all ${
-            isMaximized ? 'max-w-none max-h-none h-full m-0' : 'max-w-3xl max-h-[85vh]'
+          <div className={`bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200 border border-gray-200 dark:border-slate-700 transition-all ${
+            isMaximized ? 'max-w-none max-h-none h-full m-0' : 'max-w-4xl max-h-[90vh]'
           }`}>
-            
+
             {loadingThread ? (
               <div className="p-12 flex flex-col items-center justify-center text-gray-900 dark:text-white">
                 <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -298,7 +267,7 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
             ) : currentMessage && (
               <>
                 {/* Header */}
-                <div className="p-6 border-b border-gray-200 dark:border-slate-700 flex items-start justify-between bg-white dark:bg-[#1e293b]">
+                <div className="p-6 border-b border-gray-200 dark:border-slate-700 flex items-start justify-between bg-white dark:bg-slate-800">
                   <div className="flex-1 min-w-0 mr-8">
                     <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-snug">
                       {currentMessage.headers.subject}
@@ -325,38 +294,39 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
                 </div>
 
                 {/* Action Bar */}
-                <div className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-between">
+                <div className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 flex items-center justify-between gap-4 flex-wrap">
                   <button className="flex items-center gap-2 text-white text-sm font-medium hover:opacity-90 transition-opacity">
                     <Reply className="w-4 h-4" />
                     返信する場合はこちらから
                   </button>
-                  <button
-                    onClick={() => window.open(`https://mail.google.com/mail/u/0/#inbox/${currentMessage.id}`, '_blank')}
-                    className="flex items-center gap-2 px-4 py-1.5 bg-white text-indigo-600 text-sm font-bold rounded-lg hover:bg-gray-100 transition-colors"
-                  >
-                    <ExternalLink className="w-4 h-4" />
-                    Gmailで開く
-                  </button>
-                  <button
-                    onClick={() => handleArchive(currentMessage)}
-                    className="flex items-center gap-2 px-4 py-1.5 bg-amber-100 text-amber-700 text-sm font-bold rounded-lg hover:bg-amber-200 transition-colors"
-                  >
-                    <Archive className="w-4 h-4" />
-                    アーカイブ
-                  </button>
-                  <button
-                    onClick={() => handleDelete(currentMessage)}
-                    className="flex items-center gap-2 px-4 py-1.5 bg-red-100 text-red-700 text-sm font-bold rounded-lg hover:bg-red-200 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    削除
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => window.open(`https://mail.google.com/mail/u/0/#inbox/${currentMessage.id}`, '_blank')}
+                      className="flex items-center gap-2 px-4 py-1.5 bg-white text-indigo-600 text-sm font-bold rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      Gmailで開く
+                    </button>
+                    <button
+                      onClick={() => handleArchive(currentMessage)}
+                      className="flex items-center gap-2 px-4 py-1.5 bg-amber-100 text-amber-700 text-sm font-bold rounded-lg hover:bg-amber-200 transition-colors"
+                    >
+                      <Archive className="w-4 h-4" />
+                      アーカイブ
+                    </button>
+                    <button
+                      onClick={() => handleDelete(currentMessage)}
+                      className="flex items-center gap-2 px-4 py-1.5 bg-red-100 text-red-700 text-sm font-bold rounded-lg hover:bg-red-200 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      削除
+                    </button>
+                  </div>
                 </div>
 
                 {/* Body */}
-                <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-[#0f172a]">
+                <div className="flex-1 overflow-y-auto p-6 bg-gray-50 dark:bg-slate-900">
                   <div className="flex gap-4">
-                    {/* Left Accent Line */}
                     <div className="w-1 bg-blue-500 rounded-full flex-shrink-0 self-stretch min-h-[200px]"></div>
 
                     <div className="flex-1 min-w-0">
@@ -404,7 +374,7 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
                       </div>
 
                       {/* Message Content */}
-                      <div className="bg-white dark:bg-slate-800/50 border border-gray-200 dark:border-slate-700 rounded-xl p-6 text-gray-700 dark:text-slate-300 text-sm leading-relaxed">
+                      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl p-6 text-gray-700 dark:text-slate-300 text-sm leading-relaxed">
                         <div
                           className="prose dark:prose-invert max-w-none [&_a]:text-blue-600 dark:[&_a]:text-blue-400 [&_a]:underline [&_a]:cursor-pointer [&_a:hover]:text-blue-500 dark:[&_a:hover]:text-blue-300 [&_a]:pointer-events-auto [&_a]:relative [&_a]:z-10"
                           onClick={handleBodyClick}
@@ -465,7 +435,7 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
       {/* リンク確認ダイアログ */}
       {pendingLink && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-          <div className="bg-white dark:bg-[#1e293b] rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-slate-700 animate-in fade-in zoom-in duration-200">
+          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-2xl w-full max-w-md border border-gray-200 dark:border-slate-700 animate-in fade-in zoom-in duration-200">
             <div className="p-6 border-b border-gray-200 dark:border-slate-700">
               <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
                 <ExternalLink className="w-5 h-5 text-amber-500 dark:text-amber-400" />
@@ -476,17 +446,17 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
               <p className="text-gray-600 dark:text-slate-300 text-sm mb-4">
                 以下のリンクを新しいタブで開こうとしています。信頼できるリンクか確認してください。
               </p>
-              <div className="bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-600 rounded-lg p-3 mb-4 break-all">
+              <div className="bg-gray-100 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg p-3 mb-4 break-all">
                 <p className="text-blue-600 dark:text-blue-400 text-sm font-mono">{pendingLink}</p>
               </div>
               <p className="text-amber-600 dark:text-amber-400 text-xs">
-                ⚠️ 不審なリンクの場合はキャンセルしてください
+                不審なリンクの場合はキャンセルしてください
               </p>
             </div>
-            <div className="p-4 bg-gray-50 dark:bg-slate-800/50 rounded-b-xl flex justify-end gap-3">
+            <div className="p-4 bg-gray-50 dark:bg-slate-700/50 rounded-b-xl flex justify-end gap-3">
               <button
                 onClick={cancelOpenLink}
-                className="px-4 py-2 text-gray-600 dark:text-slate-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+                className="px-4 py-2 text-gray-600 dark:text-slate-300 text-sm font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
               >
                 キャンセル
               </button>
@@ -504,4 +474,3 @@ export default function MailList({ emails, loading = false, accessToken, onRefre
     </>
   );
 }
-

@@ -20,8 +20,9 @@ import {
   isToday
 } from 'date-fns';
 import { ja } from 'date-fns/locale';
-import { CalendarEvent, fetchEvents, updateEvent, deleteEvent, createEvent, getEvent } from '@/lib/calendarApi';
+import { CalendarEvent, fetchEvents, updateEvent, deleteEvent, createEvent, getEvent, fetchCalendarColors, CalendarColors, DEFAULT_EVENT_COLORS } from '@/lib/calendarApi';
 import { useAuth } from '@/contexts/AuthContext';
+import RecurrenceEditor from './RecurrenceEditor';
 
 interface CalendarViewProps {
   accessToken?: string | null;
@@ -30,28 +31,21 @@ interface CalendarViewProps {
 
 type ViewMode = 'month' | 'week' | 'day';
 
-const COLORS = [
-  { id: '1', bg: 'bg-indigo-500', name: 'ラベンダー' },
-  { id: '2', bg: 'bg-green-500', name: 'セージ' },
-  { id: '3', bg: 'bg-purple-600', name: 'グレープ' },
-  { id: '4', bg: 'bg-red-400', name: 'フラミンゴ' },
-  { id: '5', bg: 'bg-yellow-500', name: 'バナナ' },
-  { id: '6', bg: 'bg-orange-500', name: 'ミカン' },
-  { id: '7', bg: 'bg-blue-400', name: 'ピーコック' },
-  { id: '8', bg: 'bg-gray-500', name: 'グラファイト' },
-  { id: '9', bg: 'bg-blue-700', name: 'ブルーベリー' },
-  { id: '10', bg: 'bg-green-700', name: 'バジル' },
-  { id: '11', bg: 'bg-red-600', name: 'トマト' },
-];
+// 色の名前定義（日本語）
+const COLOR_NAMES: Record<string, string> = {
+  '1': 'ラベンダー',
+  '2': 'セージ',
+  '3': 'グレープ',
+  '4': 'フラミンゴ',
+  '5': 'バナナ',
+  '6': 'ミカン',
+  '7': 'ピーコック',
+  '8': 'グラファイト',
+  '9': 'ブルーベリー',
+  '10': 'バジル',
+  '11': 'トマト',
+};
 
-const RECURRENCE_OPTIONS = [
-  { value: '', label: '繰り返さない' },
-  { value: 'RRULE:FREQ=DAILY', label: '毎日' },
-  { value: 'RRULE:FREQ=WEEKLY', label: '毎週' },
-  { value: 'RRULE:FREQ=MONTHLY', label: '毎月' },
-  { value: 'RRULE:FREQ=YEARLY', label: '毎年' },
-  { value: 'custom', label: 'カスタム' },
-];
 
 export default function CalendarView({ accessToken, refreshTrigger }: CalendarViewProps) {
   const { setAccessToken, getValidAccessToken } = useAuth();
@@ -66,7 +60,25 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
   const [dragSelection, setDragSelection] = useState<{ date: Date, startY: number, currentY: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [eventColors, setEventColors] = useState<CalendarColors['event']>(DEFAULT_EVENT_COLORS);
   const timelineRef = useRef<HTMLDivElement>(null);
+
+  // イベントの色を取得するヘルパー関数
+  const getEventColor = useCallback((event: CalendarEvent) => {
+    // イベント自体にbackgroundColorが設定されている場合はそれを使用
+    if (event.backgroundColor) {
+      return {
+        background: event.backgroundColor,
+        foreground: event.foregroundColor || '#1d1d1d'
+      };
+    }
+    // colorIdがある場合は色定義から取得
+    if (event.colorId && eventColors[event.colorId]) {
+      return eventColors[event.colorId];
+    }
+    // デフォルト色（ピーコック/colorId=7相当）
+    return eventColors['7'] || DEFAULT_EVENT_COLORS['7'];
+  }, [eventColors]);
 
   const extractConferenceLink = (event: CalendarEvent): { url: string, type: 'google_meet' | 'teams' | 'zoom' | 'other', iconUri?: string, name?: string } | null => {
     // 1. Check conferenceData (Structure data from Google/Add-ons)
@@ -138,6 +150,25 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
       setLoading(false);
     }
   }, [accessToken, currentDate, viewMode, setAccessToken, getValidAccessToken]);
+
+  // Google Calendar Colors APIから色定義を取得
+  useEffect(() => {
+    const loadColors = async () => {
+      if (!accessToken) return;
+      try {
+        const validToken = await getValidAccessToken();
+        if (!validToken) return;
+        const colors = await fetchCalendarColors(validToken);
+        if (colors.event) {
+          setEventColors(colors.event);
+        }
+      } catch (error) {
+        console.error("Failed to fetch calendar colors", error);
+        // エラーの場合はデフォルト色を使用（既に設定済み）
+      }
+    };
+    loadColors();
+  }, [accessToken, getValidAccessToken]);
 
   // Update current time every minute
   useEffect(() => {
@@ -482,15 +513,22 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
                   </div>
                   {/* All day events could go here */}
                   <div className="min-h-[20px]">
-                    {getEventsForDate(day).filter(e => e.start.date).map(e => (
-                      <div 
-                        key={e.id} 
-                        onClick={(ev) => handleEventClick(e, ev)}
-                        className="text-[10px] bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 rounded px-1 mb-0.5 truncate mx-1 cursor-pointer hover:opacity-80"
-                      >
-                        {e.summary}
-                      </div>
-                    ))}
+                    {getEventsForDate(day).filter(e => e.start.date).map(e => {
+                      const eventColor = getEventColor(e);
+                      return (
+                        <div
+                          key={e.id}
+                          onClick={(ev) => handleEventClick(e, ev)}
+                          className="text-[10px] rounded px-1 mb-0.5 truncate mx-1 cursor-pointer hover:opacity-80"
+                          style={{
+                            backgroundColor: `${eventColor.background}30`,
+                            color: eventColor.background,
+                          }}
+                        >
+                          {e.summary}
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ))}
@@ -567,38 +605,44 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
 
                     {dayEvents.map((event) => {
                       if (!event.start.dateTime) return null; // Skip all-day events in timeline
-                      
+
                       const start = new Date(event.start.dateTime);
                       const end = event.end.dateTime ? new Date(event.end.dateTime) : addDays(start, 1); // Fallback
-                      
+
                       // Calculate position relative to 1:00
                       const startHour = start.getHours();
                       const startMin = start.getMinutes();
-                      
+
                       // Minutes from 1:00
                       let minutesFromStart = (startHour * 60 + startMin) - 60;
                       if (minutesFromStart < 0) minutesFromStart = 0; // Clip to top
 
                       const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
-                      
+
                       const top = (minutesFromStart / 60) * HOUR_HEIGHT;
                       const height = (durationMinutes / 60) * HOUR_HEIGHT;
-                      
+
                       const conferenceData = extractConferenceLink(event);
+                      const eventColor = getEventColor(event);
 
                       return (
                         <div
                           key={event.id}
                           onClick={(e) => handleEventClick(event, e)}
-                          className="absolute inset-x-1 rounded bg-blue-100 dark:bg-blue-900/60 border-l-4 border-blue-500 p-1 overflow-hidden cursor-pointer hover:opacity-90 z-10 text-xs shadow-sm group"
+                          className="absolute inset-x-1 rounded border-l-4 p-1 overflow-hidden cursor-pointer hover:opacity-90 z-10 text-xs shadow-sm group"
                           style={{
                             top: `${top}px`,
                             height: `${Math.max(24, height)}px`,
+                            backgroundColor: `${eventColor.background}20`,
+                            borderLeftColor: eventColor.background,
                           }}
                           title={`${event.summary} (${format(start, 'HH:mm')} - ${format(end, 'HH:mm')})`}
                         >
                           <div className="flex items-center justify-between gap-1">
-                            <div className="font-bold text-blue-700 dark:text-blue-100 truncate flex-1">
+                            <div
+                              className="font-bold truncate flex-1"
+                              style={{ color: eventColor.background }}
+                            >
                               {event.summary}
                             </div>
                             {conferenceData && (
@@ -607,16 +651,22 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
                                   /* eslint-disable-next-line @next/next/no-img-element */
                                   <img src={conferenceData.iconUri} alt="Conference" className="w-3.5 h-3.5" />
                                 ) : (
-                                  <Video className="w-3.5 h-3.5 text-blue-600 dark:text-blue-300" />
+                                  <Video className="w-3.5 h-3.5" style={{ color: eventColor.background }} />
                                 )}
                               </div>
                             )}
                           </div>
-                          <div className="text-blue-600 dark:text-blue-300 truncate text-[10px]">
+                          <div
+                            className="truncate text-[10px]"
+                            style={{ color: eventColor.background, opacity: 0.8 }}
+                          >
                             {format(start, 'HH:mm')} - {format(end, 'HH:mm')}
                           </div>
                           {event.location && (
-                            <div className="text-blue-500 dark:text-blue-400 truncate text-[9px] mt-0.5">
+                            <div
+                              className="truncate text-[9px] mt-0.5"
+                              style={{ color: eventColor.background, opacity: 0.7 }}
+                            >
                               {event.location}
                             </div>
                           )}
@@ -788,62 +838,10 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
                 </div>
 
                 {/* Recurrence */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">繰り返し</label>
-                  <select
-                    value={(() => {
-                      const currentRrule = editingEvent.recurrence?.[0] || '';
-                      const isStandard = RECURRENCE_OPTIONS.some(opt => opt.value === currentRrule && opt.value !== 'custom');
-                      return isStandard ? currentRrule : (currentRrule ? 'custom' : '');
-                    })()}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      if (val === 'custom') {
-                        // カスタム選択時は、既存の値があればそれを維持、なければデフォルトを入れる
-                        const currentRrule = editingEvent.recurrence?.[0];
-                        setEditingEvent({ 
-                          ...editingEvent, 
-                          recurrence: [currentRrule || 'RRULE:FREQ=WEEKLY;INTERVAL=2'] 
-                        });
-                      } else {
-                        setEditingEvent({ 
-                          ...editingEvent, 
-                          recurrence: val ? [val] : [] 
-                        });
-                      }
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none mb-2"
-                  >
-                    {RECURRENCE_OPTIONS.map(option => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
-                    ))}
-                  </select>
-                  
-                  {/* Custom Recurrence Input */}
-                  {(() => {
-                    const currentRrule = editingEvent.recurrence?.[0] || '';
-                    const isStandard = RECURRENCE_OPTIONS.some(opt => opt.value === currentRrule && opt.value !== 'custom');
-                    const isCustom = currentRrule && !isStandard;
-                    
-                    if (isCustom) {
-                      return (
-                        <div className="space-y-1">
-                          <input
-                            type="text"
-                            value={currentRrule}
-                            onChange={(e) => setEditingEvent({ ...editingEvent, recurrence: [e.target.value] })}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono"
-                            placeholder="例: RRULE:FREQ=WEEKLY;INTERVAL=2"
-                          />
-                          <p className="text-xs text-gray-500 dark:text-gray-400">
-                            RRULE形式で入力してください (例: 2週間ごと=INTERVAL=2)
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-                </div>
+                <RecurrenceEditor
+                  value={editingEvent.recurrence || []}
+                  onChange={(recurrence) => setEditingEvent({ ...editingEvent, recurrence })}
+                />
                 
                 {/* Location */}
                 <div>
@@ -861,13 +859,14 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">色</label>
                   <div className="flex flex-wrap gap-2">
-                    {COLORS.map((color) => (
+                    {Object.entries(eventColors).map(([colorId, colorValue]) => (
                       <button
-                        key={color.id}
+                        key={colorId}
                         type="button"
-                        onClick={() => setEditingEvent({ ...editingEvent, colorId: color.id })}
-                        className={`w-6 h-6 rounded-full ${color.bg} transition-transform hover:scale-110 ${editingEvent.colorId === color.id ? 'ring-2 ring-offset-2 ring-gray-400 dark:ring-offset-slate-800' : ''}`}
-                        title={color.name}
+                        onClick={() => setEditingEvent({ ...editingEvent, colorId })}
+                        className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${editingEvent.colorId === colorId ? 'ring-2 ring-offset-2 ring-gray-400 dark:ring-offset-slate-800' : ''}`}
+                        style={{ backgroundColor: colorValue.background }}
+                        title={COLOR_NAMES[colorId] || `色 ${colorId}`}
                       />
                     ))}
                   </div>

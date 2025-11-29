@@ -47,6 +47,13 @@ export interface EmailAttachment {
   size: number;
 }
 
+// インライン画像情報の型定義
+export interface InlineImage {
+  contentId: string; // Content-ID (cidで参照される)
+  mimeType: string;
+  data: string; // Base64エンコードされたデータ
+}
+
 // メール1件分の型定義
 export interface EmailMessage {
   id: string;
@@ -55,6 +62,7 @@ export interface EmailMessage {
   body?: string; // 本文を追加
   labelIds?: string[]; // ラベルID (UNREAD, INBOX等)
   attachments?: EmailAttachment[]; // 添付ファイル一覧
+  inlineImages?: InlineImage[]; // インライン画像一覧
   headers: {
     subject: string;
     from: string;
@@ -104,41 +112,55 @@ const convertTextToHtml = (text: string): string => {
 // ペイロードから本文を抽出する関数
 // テキストメールの場合は改行コード対応を行う
 const extractBody = (payload: GmailMessagePayload): string => {
-  let encodedBody = '';
-  let mimeType = '';
+  let htmlBody: string | null = null;
+  let textBody: string | null = null;
 
-  if (payload.body && payload.body.data) {
-    encodedBody = payload.body.data;
-    mimeType = payload.mimeType;
-  } else if (payload.parts) {
-    // text/html を優先して探す
-    const htmlPart = payload.parts.find((p: GmailMessagePart) => p.mimeType === 'text/html');
-    if (htmlPart && htmlPart.body && htmlPart.body.data) {
-      encodedBody = htmlPart.body.data;
-      mimeType = 'text/html';
-    } else {
-      // なければ text/plain を探す
-      const textPart = payload.parts.find((p: GmailMessagePart) => p.mimeType === 'text/plain');
-      if (textPart && textPart.body && textPart.body.data) {
-        encodedBody = textPart.body.data;
-        mimeType = 'text/plain';
-      } else {
-        // さらにネストしている場合（multipart/alternativeなど）の再帰探索は今回は簡易的に省略し、
-        // 最初のパーツを見るなどのフォールバックを入れることも可能ですが、
-        // 一般的なメール構造なら上記でカバーできます。
+  // 再帰的にパートを探索して本文候補を探す
+  const findBodyParts = (parts: GmailMessagePart[] | undefined) => {
+    if (!parts) return;
+
+    for (const part of parts) {
+      if (part.mimeType === 'text/html' && part.body?.data) {
+        // text/htmlが見つかったら優先的に採用
+        // 複数ある場合は最初のものを採用（必要に応じてロジック調整）
+        if (!htmlBody) htmlBody = part.body.data;
+      } else if (part.mimeType === 'text/plain' && part.body?.data) {
+        // text/plainはhtmlがない場合のフォールバック
+        if (!textBody) textBody = part.body.data;
       }
+
+      // ネストされたパートを再帰的に探索
+      if (part.parts) {
+        findBodyParts(part.parts);
+      }
+    }
+  };
+
+  // ルート自体が本文の場合
+  if (payload.body?.data) {
+    if (payload.mimeType === 'text/html') {
+      htmlBody = payload.body.data;
+    } else if (payload.mimeType === 'text/plain') {
+      textBody = payload.body.data;
     }
   }
 
-  const decodedBody = decodeBase64(encodedBody);
-
-  // text/plainの場合は改行コードを<br>に変換
-  if (mimeType === 'text/plain') {
-    return convertTextToHtml(decodedBody);
+  // ネストされたパートがある場合は探索
+  if (payload.parts) {
+    findBodyParts(payload.parts);
   }
 
-  // text/htmlの場合はそのまま返す
-  return decodedBody;
+  // 結果の返却（HTML優先）
+  if (htmlBody) {
+    return decodeBase64(htmlBody);
+  }
+
+  if (textBody) {
+    const decodedText = decodeBase64(textBody);
+    return convertTextToHtml(decodedText);
+  }
+
+  return '';
 };
 
 // ペイロードから添付ファイル情報を抽出する関数
@@ -170,24 +192,204 @@ const extractAttachments = (payload: GmailMessagePayload, messageId: string): Em
   return attachments;
 };
 
-// Helper to format a single message
-const formatEmailMessage = (email: GmailRawMessage): EmailMessage => {
+// インライン画像のパーツ情報（後でデータを取得するため）
+interface InlineImagePart {
+  contentId: string;
+  mimeType: string;
+  data?: string;  // 直接データがある場合
+  attachmentId?: string;  // 別途取得が必要な場合
+}
+
+// ペイロードからインライン画像を抽出する関数（同期版 - パーツ情報のみ）
+const extractInlineImageParts = (payload: GmailMessagePayload): InlineImagePart[] => {
+  const inlineImageParts: InlineImagePart[] = [];
+
+  const findInlineImages = (parts: GmailMessagePart[] | undefined) => {
+    if (!parts) return;
+
+    for (const part of parts) {
+      // 画像タイプで、Content-IDを持つ場合はインライン画像
+      if (part.mimeType?.startsWith('image/') && part.headers) {
+        const contentIdHeader = part.headers.find(h => h.name.toLowerCase() === 'content-id');
+        if (contentIdHeader) {
+          // Content-IDから<>を除去
+          let contentId = contentIdHeader.value;
+          if (contentId.startsWith('<') && contentId.endsWith('>')) {
+            contentId = contentId.slice(1, -1);
+          }
+
+          if (part.body?.data) {
+            // 直接データがある場合
+            const base64Data = part.body.data.replace(/-/g, '+').replace(/_/g, '/');
+            inlineImageParts.push({
+              contentId,
+              mimeType: part.mimeType,
+              data: base64Data,
+            });
+          } else if (part.body?.attachmentId) {
+            // attachmentIdがある場合は後で取得
+            inlineImageParts.push({
+              contentId,
+              mimeType: part.mimeType,
+              attachmentId: part.body.attachmentId,
+            });
+          }
+        }
+      }
+      // ネストされたパーツを再帰的に探索
+      if (part.parts) {
+        findInlineImages(part.parts);
+      }
+    }
+  };
+
+  findInlineImages(payload.parts);
+
+  return inlineImageParts;
+};
+
+// インライン画像のデータを取得する関数（非同期）
+const fetchInlineImageData = async (
+  accessToken: string,
+  messageId: string,
+  imageParts: InlineImagePart[]
+): Promise<InlineImage[]> => {
+  const inlineImages: InlineImage[] = [];
+
+  for (const part of imageParts) {
+    if (part.data) {
+      // 既にデータがある場合
+      inlineImages.push({
+        contentId: part.contentId,
+        mimeType: part.mimeType,
+        data: part.data,
+      });
+    } else if (part.attachmentId) {
+      // attachmentIdからデータを取得
+      try {
+        const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${part.attachmentId}`;
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          const base64Data = data.data.replace(/-/g, '+').replace(/_/g, '/');
+          inlineImages.push({
+            contentId: part.contentId,
+            mimeType: part.mimeType,
+            data: base64Data,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to fetch inline image:', part.contentId, error);
+      }
+    }
+  }
+
+  return inlineImages;
+};
+
+// 本文中のcid:参照をdata URIに置換する関数
+const replaceCidWithDataUri = (body: string, inlineImages: InlineImage[]): string => {
+  if (!body || inlineImages.length === 0) return body;
+
+  let result = body;
+
+  for (const image of inlineImages) {
+    const dataUri = `data:${image.mimeType};base64,${image.data}`;
+
+    // 1. 通常のパターン: src="cid:contentId"
+    // src="cid:xxx" や src='cid:xxx' の両方に対応
+    const cidPattern = new RegExp(`(src=["'])cid:${escapeRegExp(image.contentId)}(["'])`, 'gi');
+    result = result.replace(cidPattern, `$1${dataUri}$2`);
+
+    // 2. URLエンコードされたパターンを考慮
+    // メール本文内のcidリンクがURLエンコードされている場合があるため (例: foo@bar -> foo%40bar)
+    const encodedId = encodeURIComponent(image.contentId);
+    if (encodedId !== image.contentId) {
+      const cidPatternEncoded = new RegExp(`(src=["'])cid:${escapeRegExp(encodedId)}(["'])`, 'gi');
+      result = result.replace(cidPatternEncoded, `$1${dataUri}$2`);
+    }
+  }
+
+  return result;
+};
+
+// 正規表現の特殊文字をエスケープする関数
+const escapeRegExp = (str: string): string => {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
+// 初期フォーマット結果（インライン画像はまだ未処理）
+interface FormattedEmailWithParts {
+  email: EmailMessage;
+  inlineImageParts: InlineImagePart[];
+}
+
+// Helper to format a single message (同期版 - インライン画像パーツ情報も返す)
+const formatEmailMessage = (email: GmailRawMessage): FormattedEmailWithParts | null => {
+  // payloadがない場合はnullを返す（不完全なレスポンス）
+  if (!email || !email.payload || !email.payload.headers) {
+    console.warn('Incomplete email data:', email?.id);
+    return null;
+  }
+
   const headers = email.payload.headers;
   const getHeader = (name: string) => headers.find((h: GmailMessageHeader) => h.name === name)?.value || "";
 
+  // インライン画像のパーツ情報を抽出（データ取得は後で行う）
+  const inlineImageParts = extractInlineImageParts(email.payload);
+
+  // 本文を抽出
+  const body = extractBody(email.payload);
+
   return {
-    id: email.id,
-    threadId: email.threadId,
-    snippet: email.snippet,
-    body: extractBody(email.payload),
-    labelIds: email.labelIds || [],
-    attachments: extractAttachments(email.payload, email.id),
-    headers: {
-      subject: getHeader("Subject") || "(No Subject)",
-      from: getHeader("From") || "(Unknown Sender)",
-      to: getHeader("To") || "(Unknown Recipient)",
-      date: getHeader("Date"),
+    email: {
+      id: email.id,
+      threadId: email.threadId,
+      snippet: email.snippet,
+      body,
+      labelIds: email.labelIds || [],
+      attachments: extractAttachments(email.payload, email.id),
+      inlineImages: [],  // 後で設定される
+      headers: {
+        subject: getHeader("Subject") || "(No Subject)",
+        from: getHeader("From") || "(Unknown Sender)",
+        to: getHeader("To") || "(Unknown Recipient)",
+        date: getHeader("Date"),
+      },
     },
+    inlineImageParts,
+  };
+};
+
+// インライン画像を処理してメールを完成させる関数
+const processInlineImages = async (
+  accessToken: string,
+  formatted: FormattedEmailWithParts
+): Promise<EmailMessage> => {
+  if (formatted.inlineImageParts.length === 0) {
+    return formatted.email;
+  }
+
+  // インライン画像のデータを取得
+  const inlineImages = await fetchInlineImageData(
+    accessToken,
+    formatted.email.id,
+    formatted.inlineImageParts
+  );
+
+  // CID参照をdata URIに置換
+  let body = formatted.email.body || '';
+  if (inlineImages.length > 0) {
+    body = replaceCidWithDataUri(body, inlineImages);
+  }
+
+  return {
+    ...formatted.email,
+    body,
+    inlineImages,
   };
 };
 
@@ -197,21 +399,21 @@ const formatEmailMessage = (email: GmailRawMessage): EmailMessage => {
  * @param maxResults 取得件数（デフォルト20件）
  */
 export const fetchInboxEmails = async (accessToken: string, maxResults = 20): Promise<{ count: number, emails: EmailMessage[], unreadCount: number }> => {
-  
+
   // 1. まずメッセージの「IDリスト」を取得 (List API)
   const listUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=in:inbox&maxResults=${maxResults}`;
-  
+
   const listRes = await fetch(listUrl, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  
+
   if (!listRes.ok) {
     const errorBody = await listRes.text();
     console.error(`Gmail API Error: ${listRes.status} ${listRes.statusText}`, errorBody);
     throw new Error(`Failed to fetch inbox messages: ${listRes.status} ${listRes.statusText}`);
   }
   const listData = await listRes.json();
-  
+
   const totalCount = listData.resultSizeEstimate || 0;
   const messages = listData.messages || [];
   if (messages.length === 0) return { count: totalCount, emails: [], unreadCount: 0 };
@@ -227,11 +429,18 @@ export const fetchInboxEmails = async (accessToken: string, maxResults = 20): Pr
 
   const rawDetails: GmailRawMessage[] = await Promise.all(detailPromises);
 
-  // 3. 使いやすい形に整形する
-  const formattedEmails = rawDetails.map(formatEmailMessage);
-  
-  // 4. 未読数をカウント
-  const unreadCount = rawDetails.filter((email: GmailRawMessage) => 
+  // 3. 使いやすい形に整形する（不完全なデータはフィルタリング）
+  const formattedWithParts = rawDetails
+    .map(formatEmailMessage)
+    .filter((result): result is FormattedEmailWithParts => result !== null);
+
+  // 4. インライン画像を処理
+  const formattedEmails = await Promise.all(
+    formattedWithParts.map(formatted => processInlineImages(accessToken, formatted))
+  );
+
+  // 5. 未読数をカウント
+  const unreadCount = rawDetails.filter((email: GmailRawMessage) =>
     email.labelIds && email.labelIds.includes('UNREAD')
   ).length;
 
@@ -245,27 +454,20 @@ export const fetchInboxEmails = async (accessToken: string, maxResults = 20): Pr
  */
 export const fetchUnreadEmails = async (accessToken: string, maxResults = 10): Promise<{ count: number, emails: EmailMessage[] }> => {
   // 1. 未読メッセージのリストと総数を取得
-  // includeSpamTrash=false はデフォルトですが、明示的に除外
   const listUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread&maxResults=${maxResults}`;
-  
+
   const listRes = await fetch(listUrl, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  
+
   if (!listRes.ok) {
     const errorBody = await listRes.text();
     console.error(`Gmail API Error: ${listRes.status} ${listRes.statusText}`, errorBody);
     throw new Error(`Failed to fetch unread messages: ${listRes.status} ${listRes.statusText}`);
   }
   const listData = await listRes.json();
-  
-  // resultSizeEstimate は概算ですが、未読数として使えます
-  // 正確な数は messages.length ですが、ページネーションがあるため、
-  // 全体の未読数を知るには profile API を叩くのが確実ですが、ここでは簡易的に resultSizeEstimate を使うか、
-  // 別途 getProfile を呼ぶのが良いでしょう。
-  // 今回は listData.resultSizeEstimate を使います。
+
   const unreadCount = listData.resultSizeEstimate || 0;
-  
   const messages = listData.messages || [];
   if (messages.length === 0) return { count: unreadCount, emails: [] };
 
@@ -280,14 +482,21 @@ export const fetchUnreadEmails = async (accessToken: string, maxResults = 10): P
 
   const rawDetails: GmailRawMessage[] = await Promise.all(detailPromises);
 
-  // 3. 整形
-  const formattedEmails = rawDetails.map(formatEmailMessage);
+  // 3. 整形（不完全なデータはフィルタリング）
+  const formattedWithParts = rawDetails
+    .map(formatEmailMessage)
+    .filter((result): result is FormattedEmailWithParts => result !== null);
+
+  // 4. インライン画像を処理
+  const formattedEmails = await Promise.all(
+    formattedWithParts.map(formatted => processInlineImages(accessToken, formatted))
+  );
 
   return { count: unreadCount, emails: formattedEmails };
 };
 
 /**
-// スレッド内の全メッセージを取得する関数
+ * スレッド内の全メッセージを取得する関数
  * @param accessToken アクセストークン
  * @param threadId スレッドID
  */
@@ -296,12 +505,22 @@ export const fetchThread = async (accessToken: string, threadId: string): Promis
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
-  
+
   if (!res.ok) throw new Error(`Failed to fetch thread: ${res.status}`);
-  
+
   const data = await res.json();
-  // messages are usually sorted by date in the thread response
-  return (data.messages || []).map(formatEmailMessage);
+
+  // 整形
+  const formattedWithParts = (data.messages || [])
+    .map(formatEmailMessage)
+    .filter((result: FormattedEmailWithParts | null): result is FormattedEmailWithParts => result !== null);
+
+  // インライン画像を処理
+  const formattedEmails = await Promise.all(
+    formattedWithParts.map((formatted: FormattedEmailWithParts) => processInlineImages(accessToken, formatted))
+  );
+
+  return formattedEmails;
 };
 
 /**
@@ -369,6 +588,99 @@ export const trashEmail = async (accessToken: string, messageId: string): Promis
     const errorBody = await res.text();
     throw new Error(`Failed to trash email: ${res.status} ${errorBody}`);
   }
+};
+
+/**
+ * スター付きメールを取得する関数
+ * @param accessToken アクセストークン
+ * @param maxResults 最大取得件数
+ */
+export const fetchStarredEmails = async (accessToken: string, maxResults = 50): Promise<{ count: number, emails: EmailMessage[] }> => {
+  const listUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:starred&maxResults=${maxResults}`;
+
+  const listRes = await fetch(listUrl, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!listRes.ok) {
+    const errorBody = await listRes.text();
+    console.error(`Gmail API Error: ${listRes.status} ${listRes.statusText}`, errorBody);
+    throw new Error(`Failed to fetch starred messages: ${listRes.status} ${listRes.statusText}`);
+  }
+  const listData = await listRes.json();
+
+  const totalCount = listData.resultSizeEstimate || 0;
+  const messages = listData.messages || [];
+  if (messages.length === 0) return { count: totalCount, emails: [] };
+
+  const detailPromises = messages.map(async (msg: { id: string }) => {
+    const detailUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`;
+    const res = await fetch(detailUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return res.json();
+  });
+
+  const rawDetails: GmailRawMessage[] = await Promise.all(detailPromises);
+
+  // 整形
+  const formattedWithParts = rawDetails
+    .map(formatEmailMessage)
+    .filter((result): result is FormattedEmailWithParts => result !== null);
+
+  // インライン画像を処理
+  const formattedEmails = await Promise.all(
+    formattedWithParts.map(formatted => processInlineImages(accessToken, formatted))
+  );
+
+  return { count: totalCount, emails: formattedEmails };
+};
+
+/**
+ * すべてのメールを取得する関数（受信トレイ以外も含む）
+ * @param accessToken アクセストークン
+ * @param maxResults 最大取得件数
+ */
+export const fetchAllEmails = async (accessToken: string, maxResults = 50): Promise<{ count: number, emails: EmailMessage[] }> => {
+  // 空のクエリですべてのメールを取得（スパム・ゴミ箱を除く）
+  const listUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=${maxResults}`;
+
+  const listRes = await fetch(listUrl, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+
+  if (!listRes.ok) {
+    const errorBody = await listRes.text();
+    console.error(`Gmail API Error: ${listRes.status} ${listRes.statusText}`, errorBody);
+    throw new Error(`Failed to fetch all messages: ${listRes.status} ${listRes.statusText}`);
+  }
+  const listData = await listRes.json();
+
+  const totalCount = listData.resultSizeEstimate || 0;
+  const messages = listData.messages || [];
+  if (messages.length === 0) return { count: totalCount, emails: [] };
+
+  const detailPromises = messages.map(async (msg: { id: string }) => {
+    const detailUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`;
+    const res = await fetch(detailUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return res.json();
+  });
+
+  const rawDetails: GmailRawMessage[] = await Promise.all(detailPromises);
+
+  // 整形
+  const formattedWithParts = rawDetails
+    .map(formatEmailMessage)
+    .filter((result): result is FormattedEmailWithParts => result !== null);
+
+  // インライン画像を処理
+  const formattedEmails = await Promise.all(
+    formattedWithParts.map(formatted => processInlineImages(accessToken, formatted))
+  );
+
+  return { count: totalCount, emails: formattedEmails };
 };
 
 /**
