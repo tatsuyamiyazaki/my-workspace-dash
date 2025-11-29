@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { Loader2, Plus, X, Trash2, Filter, ExternalLink } from 'lucide-react';
 import { fetchTasks, fetchTaskLists, createTask, updateTask, deleteTask, Task, TaskList as ITaskList } from '@/lib/tasksApi';
 import { useAuth } from '@/contexts/AuthContext';
-import { isToday, parseISO } from 'date-fns';
+import { isToday, parseISO, isPast } from 'date-fns';
 import Link from 'next/link';
 
 interface TaskListProps {
@@ -224,7 +224,7 @@ export default function TaskList({ accessToken, refreshTrigger }: TaskListProps)
                   </span>
                   <div className="flex items-center gap-2 mt-0.5">
                     {task.due && (
-                      <span className={`text-xs ${isToday(parseISO(task.due)) ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                      <span className={`text-xs ${task.due && isPast(parseISO(task.due)) ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
                         {new Date(task.due).toLocaleDateString()}
                       </span>
                     )}

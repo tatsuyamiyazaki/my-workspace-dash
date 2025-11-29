@@ -74,31 +74,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     isRefreshingRef.current = true;
 
     try {
-      // Googleで再認証してトークンを更新
-      const result = await signInWithPopup(auth, googleProvider);
-      const credential = GoogleAuthProvider.credentialFromResult(result);
-      const newAccessToken = credential?.accessToken;
+      const refreshToken = localStorage.getItem('google_refresh_token');
+      
+      if (!refreshToken) {
+        console.warn('No refresh token found. User needs to sign in again.');
+        return null;
+      }
+
+      // APIルートを叩いて更新
+      const response = await fetch('/api/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh token via API');
+      }
+
+      const data = await response.json();
+      const newAccessToken = data.accessToken;
 
       if (newAccessToken) {
-        setAccessToken(newAccessToken, 3600);
-        console.log('Access token refreshed successfully');
+        // 新しいトークンをセット (有効期限も更新)
+        setAccessToken(newAccessToken, data.expiresIn || 3600);
+        console.log('Access token refreshed successfully via API');
         return newAccessToken;
       }
       return null;
-    } catch (error: unknown) {
-      if (error instanceof Error && 'code' in error) {
-        const errorCode = (error as { code: string }).code;
-        if (errorCode === 'auth/popup-blocked') {
-          console.warn('Token refresh failed: Popup was blocked. User interaction is required to refresh the token.');
-        } else if (errorCode === 'auth/popup-closed-by-user') {
-          // ユーザーがポップアップを閉じた場合は正常な動作なのでログを出さない
-          console.debug('User closed the login popup');
-        } else {
-          console.error('Failed to refresh access token:', error);
-        }
-      } else {
-        console.error('Failed to refresh access token:', error);
-      }
+    } catch (error) {
+      console.error('Failed to refresh access token:', error);
       return null;
     } finally {
       isRefreshingRef.current = false;

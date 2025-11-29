@@ -24,3 +24,9 @@ export const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('https://www.googleapis.com/auth/gmail.modify');
 googleProvider.addScope('https://www.googleapis.com/auth/calendar');
 googleProvider.addScope('https://www.googleapis.com/auth/tasks');
+
+// リフレッシュトークンを取得するための設定
+googleProvider.setCustomParameters({
+  access_type: 'offline',
+  prompt: 'consent',
+});

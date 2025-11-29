@@ -20,8 +20,18 @@ export default function LoginPage() {
       const credential = GoogleAuthProvider.credentialFromResult(result);
       const accessToken = credential?.accessToken;
 
+      // リフレッシュトークンの取得 (型定義の回避のため any キャストを使用)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const refreshToken = (result as any)._tokenResponse?.oauthRefreshToken;
+
       if (accessToken) {
         console.log("Access Token:", accessToken);
+        
+        // リフレッシュトークンを保存
+        if (refreshToken) {
+          localStorage.setItem('google_refresh_token', refreshToken);
+        }
+
         // トークンの有効期限は1時間（3600秒）
         setAccessToken(accessToken, 3600);
         // ログイン成功したらダッシュボードへ遷移
