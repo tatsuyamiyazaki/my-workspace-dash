@@ -22,14 +22,29 @@ export default function LoginPage() {
 
       // リフレッシュトークンの取得 (型定義の回避のため any キャストを使用)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const refreshToken = (result as any)._tokenResponse?.oauthRefreshToken;
+      const tokenResponse = (result as any)._tokenResponse;
+
+      if (tokenResponse) {
+        console.log("Token Response Keys:", Object.keys(tokenResponse));
+        console.log("oauthRefreshToken:", tokenResponse.oauthRefreshToken);
+        console.log("refreshToken (Firebase?):", tokenResponse.refreshToken);
+      } else {
+        console.error("No token response found in result");
+      }
+
+      const refreshToken = tokenResponse?.oauthRefreshToken;
 
       if (accessToken) {
         console.log("Access Token:", accessToken);
-        
+
         // リフレッシュトークンを保存
         if (refreshToken) {
           localStorage.setItem('google_refresh_token', refreshToken);
+          console.log("Google Refresh Token saved to localStorage");
+        } else {
+          console.warn("Google Refresh Token (oauthRefreshToken) not found!");
+          console.warn("Check if 'access_type: offline' and 'prompt: consent' are correctly set in firebase.ts");
+          console.warn("Try revoking app access in Google Account settings and logging in again.");
         }
 
         // トークンの有効期限は1時間（3600秒）
