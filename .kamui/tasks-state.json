@@ -20,28 +20,5 @@
     "aiCompetitionMonitor": false,
     "monitorTargets": null,
     "scoringConfig": null
-  },
-  {
-    "id": "task-1764592774462-0e6e5b",
-    "name": "ClaudeCode1: カレンダーが更新されると最上位の箇所が表示されますが、これを現在の時刻の付近を表示してほしいです。",
-    "model": "Claude Code",
-    "status": "working",
-    "importance": "medium",
-    "urgency": "medium",
-    "createdAt": "2025-12-01T12:39:34.462Z",
-    "updatedAt": "2025-12-01T12:39:34.462Z",
-    "requiresTerminal": true,
-    "createWorktree": true,
-    "branchName": "task/task-1764592774462-0e6e5b",
-    "baseBranch": "main",
-    "useTmux": true,
-    "aiCompetitionEntry": true,
-    "aiCompetitionResult": null,
-    "aiCompetitionGroupId": "comp-1764592770097-q8f2bk4f",
-    "aiCompetitionGroupName": "カレンダーが更新されると最上位の箇所が表示されますが、これを現在の時刻の付近を表示してほしいです。",
-    "aiCompetitionMonitor": false,
-    "monitorTargets": null,
-    "scoringConfig": null,
-    "worktreePath": ".worktrees\\task-1764592774462-0e6e5b"
   }
 ]
