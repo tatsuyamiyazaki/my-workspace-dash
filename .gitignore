@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.kamui/apps/*
+.kamui/gantte/test.yaml
+.kamui/prompt/merge-prompt.txt
+.kamui/system-graph-state.json
+.kamui/model-versions-cache.json
+
+.worktrees
