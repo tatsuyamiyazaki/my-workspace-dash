@@ -176,14 +176,14 @@ export default function CalendarView({ accessToken, refreshTrigger }: CalendarVi
     return () => clearInterval(timer);
   }, []);
 
-  // Scroll to current time when viewMode is week or day
+  // Scroll to current time when viewMode is week or day, or after events are loaded
   useEffect(() => {
-    if (timelineRef.current && (viewMode === 'week' || viewMode === 'day')) {
-      const currentHour = now.getHours();
+    if (timelineRef.current && (viewMode === 'week' || viewMode === 'day') && !loading) {
+      const currentHour = new Date().getHours();
       const scrollPosition = (currentHour - 1) * 60; // Scroll to one hour before current hour
       timelineRef.current.scrollTop = scrollPosition;
     }
-  }, [viewMode, now]);
+  }, [viewMode, loading]);
 
   // Fetch events when date or view mode changes
   useEffect(() => {
