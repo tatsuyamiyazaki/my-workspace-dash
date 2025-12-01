@@ -1,9 +1,22 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Loader2, Plus, X, Trash2, Filter, ExternalLink } from 'lucide-react';
+import { Loader2, Plus, X, Trash2, Filter, ExternalLink, Repeat } from 'lucide-react';
 import { fetchTasks, fetchTaskLists, createTask, updateTask, deleteTask, Task, TaskList as ITaskList } from '@/lib/tasksApi';
 import { useAuth } from '@/contexts/AuthContext';
-import { isToday, parseISO, isPast } from 'date-fns';
+import { isToday, parseISO, isPast, addDays, addWeeks, addMonths, addYears } from 'date-fns';
 import Link from 'next/link';
+
+type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
+interface RecurrenceSettings {
+  enabled: boolean;
+  type: RecurrenceType;
+  count: number;
+}
+
+interface EditingTask extends Partial<Task> {
+  originalTaskListId?: string;
+  recurrence?: RecurrenceSettings;
+}
 
 interface TaskListProps {
   accessToken?: string | null;
@@ -15,7 +28,7 @@ export default function TaskList({ accessToken, refreshTrigger }: TaskListProps)
   const [tasks, setTasks] = useState<Task[]>([]);
   const [taskLists, setTaskLists] = useState<ITaskList[]>([]);
   const [loading, setLoading] = useState(false);
-  const [editingTask, setEditingTask] = useState<Partial<Task> & { originalTaskListId?: string } | null>(null);
+  const [editingTask, setEditingTask] = useState<EditingTask | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showTodayOnly, setShowTodayOnly] = useState(false);
 
@@ -90,6 +103,22 @@ export default function TaskList({ accessToken, refreshTrigger }: TaskListProps)
     setEditingTask({ ...task, originalTaskListId: task.taskListId });
   };
 
+  // 繰り返し日付を計算するヘルパー関数
+  const getNextDate = (baseDate: Date, type: RecurrenceType, index: number): Date => {
+    switch (type) {
+      case 'daily':
+        return addDays(baseDate, index);
+      case 'weekly':
+        return addWeeks(baseDate, index);
+      case 'monthly':
+        return addMonths(baseDate, index);
+      case 'yearly':
+        return addYears(baseDate, index);
+      default:
+        return addDays(baseDate, index);
+    }
+  };
+
   const handleSaveTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!accessToken || !editingTask) return;
@@ -98,22 +127,43 @@ export default function TaskList({ accessToken, refreshTrigger }: TaskListProps)
 
     try {
       setIsSaving(true);
-      
+
       if (editingTask.id) {
         // Update existing task
         if (editingTask.originalTaskListId && editingTask.originalTaskListId !== targetListId) {
             // List changed: Delete from old list, Create in new list
             await deleteTask(accessToken, editingTask.originalTaskListId, editingTask.id);
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            const { id: _id, originalTaskListId: _originalTaskListId, ...taskData } = editingTask; // Remove ID to create new
+            const { id: _id, originalTaskListId: _originalTaskListId, recurrence: _recurrence, ...taskData } = editingTask;
             await createTask(accessToken, targetListId, taskData);
         } else {
             // Normal update
-            await updateTask(accessToken, targetListId, editingTask.id, editingTask);
+            const { recurrence: _recurrence, ...taskData } = editingTask;
+            await updateTask(accessToken, targetListId, editingTask.id, taskData);
         }
       } else {
         // Create new task
-        await createTask(accessToken, targetListId, editingTask);
+        const { recurrence, ...taskData } = editingTask;
+
+        if (recurrence?.enabled && recurrence.count > 1 && editingTask.due) {
+          // 繰り返しタスクを複数生成
+          const baseDate = new Date(editingTask.due);
+          const tasksToCreate: Promise<Task>[] = [];
+
+          for (let i = 0; i < recurrence.count; i++) {
+            const newDueDate = getNextDate(baseDate, recurrence.type, i);
+            tasksToCreate.push(
+              createTask(accessToken, targetListId, {
+                ...taskData,
+                due: newDueDate.toISOString(),
+              })
+            );
+          }
+
+          await Promise.all(tasksToCreate);
+        } else {
+          // 通常の単一タスク作成
+          await createTask(accessToken, targetListId, taskData);
+        }
       }
       await loadTasks();
       setEditingTask(null);
@@ -296,6 +346,90 @@ export default function TaskList({ accessToken, refreshTrigger }: TaskListProps)
                     className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
                   />
                 </div>
+
+                {/* 繰り返し設定 - 新規タスク作成時のみ表示 */}
+                {!editingTask.id && (
+                  <div className="space-y-3 p-3 bg-gray-50 dark:bg-slate-900/50 rounded-lg border border-gray-200 dark:border-slate-700">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="recurrence-enabled-widget"
+                        checked={editingTask.recurrence?.enabled || false}
+                        onChange={(e) =>
+                          setEditingTask({
+                            ...editingTask,
+                            recurrence: {
+                              enabled: e.target.checked,
+                              type: editingTask.recurrence?.type || 'daily',
+                              count: editingTask.recurrence?.count || 5,
+                            },
+                          })
+                        }
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                      <label
+                        htmlFor="recurrence-enabled-widget"
+                        className="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                      >
+                        <Repeat className="w-4 h-4" />
+                        繰り返しタスクを作成
+                      </label>
+                    </div>
+
+                    {editingTask.recurrence?.enabled && (
+                      <div className="space-y-3 pl-6">
+                        <div className="flex items-center gap-3">
+                          <select
+                            value={editingTask.recurrence?.type || 'daily'}
+                            onChange={(e) =>
+                              setEditingTask({
+                                ...editingTask,
+                                recurrence: {
+                                  ...editingTask.recurrence!,
+                                  type: e.target.value as RecurrenceType,
+                                },
+                              })
+                            }
+                            className="px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                          >
+                            <option value="daily">毎日</option>
+                            <option value="weekly">毎週</option>
+                            <option value="monthly">毎月</option>
+                            <option value="yearly">毎年</option>
+                          </select>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">×</span>
+                          <input
+                            type="number"
+                            min="2"
+                            max="52"
+                            value={editingTask.recurrence?.count || 5}
+                            onChange={(e) =>
+                              setEditingTask({
+                                ...editingTask,
+                                recurrence: {
+                                  ...editingTask.recurrence!,
+                                  count: Math.max(2, Math.min(52, parseInt(e.target.value) || 2)),
+                                },
+                              })
+                            }
+                            className="w-20 px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                          />
+                          <span className="text-sm text-gray-600 dark:text-gray-400">回</span>
+                        </div>
+                        {!editingTask.due && (
+                          <p className="text-xs text-amber-600 dark:text-amber-400">
+                            ※ 繰り返しタスクを作成するには期限を設定してください
+                          </p>
+                        )}
+                        {editingTask.due && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">
+                            {editingTask.recurrence?.count || 5}件のタスクが作成されます
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">詳細</label>

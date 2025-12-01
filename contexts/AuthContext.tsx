@@ -1,9 +1,9 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
-import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { User, onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot, setDoc } from 'firebase/firestore';
-import { auth, db, googleProvider } from '@/lib/firebase';
+import { auth, db } from '@/lib/firebase';
 
 interface AuthContextType {
   user: User | null;
@@ -35,8 +35,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [accessToken, setAccessTokenState] = useState<string | null>(null);
   const [tokenExpiry, setTokenExpiry] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
-  const refreshTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const isRefreshingRef = useRef(false);
 
   // トークンが期限切れかどうかをチェック
   const isTokenExpired = useCallback(() => {
@@ -60,81 +58,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, []);
 
-  // トークンを更新する関数
+  // トークンを更新する関数（リフレッシュトークン機能は削除済み）
   const refreshAccessToken = useCallback(async (): Promise<string | null> => {
-    if (!user) return null;
+    // リフレッシュトークン機能は削除されたため、再ログインが必要
+    return null;
+  }, []);
 
-    // 既に更新中の場合は待機
-    if (isRefreshingRef.current) {
-      // 更新が完了するまで少し待つ
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      return sessionStorage.getItem(ACCESS_TOKEN_KEY);
-    }
-
-    isRefreshingRef.current = true;
-
-    try {
-      const refreshToken = localStorage.getItem('google_refresh_token');
-      
-      if (!refreshToken) {
-        console.warn('No refresh token found. User needs to sign in again.');
-        return null;
-      }
-
-      // APIルートを叩いて更新
-      const response = await fetch('/api/auth/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to refresh token via API');
-      }
-
-      const data = await response.json();
-      const newAccessToken = data.accessToken;
-
-      if (newAccessToken) {
-        // 新しいトークンをセット (有効期限も更新)
-        setAccessToken(newAccessToken, data.expiresIn || 3600);
-        console.log('Access token refreshed successfully via API');
-        return newAccessToken;
-      }
-      return null;
-    } catch (error) {
-      console.error('Failed to refresh access token:', error);
-      return null;
-    } finally {
-      isRefreshingRef.current = false;
-    }
-  }, [user, setAccessToken]);
-
-  // 有効なトークンを取得する（期限切れなら更新）
+  // 有効なトークンを取得する（期限切れならnullを返す）
   const getValidAccessToken = useCallback(async (): Promise<string | null> => {
     if (!accessToken) return null;
 
     if (isTokenExpired()) {
-      console.log('Token expired or expiring soon, refreshing...');
-      return await refreshAccessToken();
+      console.log('Token expired or expiring soon, user needs to re-login');
+      return null;
     }
 
     return accessToken;
-  }, [accessToken, isTokenExpired, refreshAccessToken]);
-
-  // トークン自動更新のタイマーは削除
-  // ブラウザのポップアップブロッカーにより、ユーザー操作を伴わないsignInWithPopupはブロックされるため
-  // 自動更新は行わず、必要に応じてユーザーに再認証を求めるか、
-  // ユーザー操作（ボタンクリックなど）のタイミングでrefreshAccessTokenを呼び出す必要があります。
-  useEffect(() => {
-    // クリーンアップのみ行う
-    const timerId = refreshTimerRef.current;
-    return () => {
-      if (timerId) {
-        clearTimeout(timerId);
-      }
-    };
-  }, []);
+  }, [accessToken, isTokenExpired]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
