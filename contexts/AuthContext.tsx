@@ -190,35 +190,7 @@ const SettingsContext = createContext<SettingsContextType>({
 export const SettingsProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
 
-  // ローカルストレージからFirestoreへの移行関数
-  const migrateLocalToFirestore = useCallback(async (uid: string) => {
-    const localInterval = localStorage.getItem('dashboardRefreshInterval');
-    const localNotifTime = localStorage.getItem('notificationMinutes');
-    const localNotifEnabled = localStorage.getItem('notificationsEnabled');
-    const localFixed = localStorage.getItem('fixedLinks');
-    const localCustom = localStorage.getItem('customLinks');
-    const localFolders = localStorage.getItem('linkFolders');
-
-    const initialData = {
-      settings: {
-        refreshInterval: localInterval ? parseInt(localInterval) : 1,
-        notificationMinutes: localNotifTime ? JSON.parse(localNotifTime) : [5, 15],
-        notificationsEnabled: localNotifEnabled === 'true',
-        fixedLinks: localFixed ? JSON.parse(localFixed) : DEFAULT_FIXED_LINKS,
-        noteGridColumns: 2,
-      },
-      customLinks: localCustom ? JSON.parse(localCustom) : [],
-      folders: localFolders ? JSON.parse(localFolders) : [],
-    };
-
-    // Firestoreに保存
-    await setDoc(doc(db, "users", uid), initialData, { merge: true });
-
-    // オプション: 移行後にローカルストレージをクリアするならここで実行
-    // localStorage.clear();
-  }, []);
-
-  // Filrestoreへの保存ヘルパー関数
+  // Firestoreへの保存ヘルパー関数
   const saveToFirestore = useCallback(async (key: string, value: unknown) => {
     if (!user) return;
     const userDocRef = doc(db, 'users', user.uid);
@@ -258,7 +230,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     const userDocRef = doc(db, 'users', user.uid);
 
     // リアルタイムリステナーを設定
-    const unsubscribe = onSnapshot(userDocRef, async (docSnap) => {
+    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
       if (docSnap.exists()) {
         // FirestoreにデータがあればStateに反映
         const data = docSnap.data();
@@ -271,14 +243,12 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
         }
         setCustomLinksState(data.customLinks ?? []);
         setFoldersState(data.folders ?? []);
-      } else {
-        // Firestoreにデータがない場合（初回ログイン時など）、ローカルストレージから移行を試みる
-        await migrateLocalToFirestore(user.uid);
       }
+      // Firestoreにデータがない場合はデフォルト値を維持
     });
 
     return () => unsubscribe();
-  }, [user, migrateLocalToFirestore]);
+  }, [user]);
 
   // Setter functions wrappers
   const setRefreshInterval = (val: number) => {
