@@ -195,22 +195,26 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     if (!user) return;
     const userDocRef = doc(db, 'users', user.uid);
 
-    // setting配下のデータか、ルート直下のデータ (customLinks or folders) かで分岐
-    if (['refreshInterval', 'notificationMinutes', 'notificationsEnabled', 'fixedLinks', 'noteGridColumns'].includes(key)) {
-      // Type guard for settings properties
-      if (key === 'refreshInterval' && typeof value !== 'number') return;
-      if (key === 'notificationMinutes' && (!Array.isArray(value) || !value.every(item => typeof item === 'number'))) return;
-      if (key === 'notificationsEnabled' && typeof value !== 'boolean') return;
-      if (key === 'fixedLinks' && (!Array.isArray(value) || !value.every((item: FixedLink) => typeof item === 'object' && 'id' in item && 'name' in item && 'url' in item && 'icon' in item))) return;
-      if (key === 'noteGridColumns' && typeof value !== 'number') return;
+    try {
+      // setting配下のデータか、ルート直下のデータ (customLinks or folders) かで分岐
+      if (['refreshInterval', 'notificationMinutes', 'notificationsEnabled', 'fixedLinks', 'noteGridColumns'].includes(key)) {
+        // Type guard for settings properties
+        if (key === 'refreshInterval' && typeof value !== 'number') return;
+        if (key === 'notificationMinutes' && (!Array.isArray(value) || !value.every(item => typeof item === 'number'))) return;
+        if (key === 'notificationsEnabled' && typeof value !== 'boolean') return;
+        if (key === 'fixedLinks' && (!Array.isArray(value) || !value.every((item: FixedLink) => typeof item === 'object' && 'id' in item && 'name' in item && 'url' in item && 'icon' in item))) return;
+        if (key === 'noteGridColumns' && typeof value !== 'number') return;
 
-      await setDoc(userDocRef, { settings: { [key]: value } }, { merge: true });
-    } else {
-      // Type guard for root properties
-      if (key === 'customLinks' && (!Array.isArray(value) || !value.every((item: CustomLink) => typeof item === 'object' && 'id' in item && 'name' in item && 'url' in item && 'icon' in item))) return;
-      if (key === 'folders' && (!Array.isArray(value) || !value.every((item: LinkFolder) => typeof item === 'object' && 'id' in item && 'name' in item && 'icon' in item))) return;
+        await setDoc(userDocRef, { settings: { [key]: value } }, { merge: true });
+      } else {
+        // Type guard for root properties
+        if (key === 'customLinks' && (!Array.isArray(value) || !value.every((item: CustomLink) => typeof item === 'object' && 'id' in item && 'name' in item && 'url' in item && 'icon' in item))) return;
+        if (key === 'folders' && (!Array.isArray(value) || !value.every((item: LinkFolder) => typeof item === 'object' && 'id' in item && 'name' in item && 'icon' in item))) return;
 
-      await setDoc(userDocRef, { [key]: value }, { merge: true });
+        await setDoc(userDocRef, { [key]: value }, { merge: true });
+      }
+    } catch (error) {
+      console.error(`Failed to save ${key} to Firestore:`, error);
     }
   }, [user]);
 
@@ -230,22 +234,27 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     const userDocRef = doc(db, 'users', user.uid);
 
     // リアルタイムリステナーを設定
-    const unsubscribe = onSnapshot(userDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        // FirestoreにデータがあればStateに反映
-        const data = docSnap.data();
-        if (data.settings) {
-          setRefreshIntervalState(data.settings.refreshInterval ?? 1);
-          setNotificationMinutesState(data.settings.notificationMinutes ?? [5, 15]);
-          setNotificationsEnabledState(data.settings.notificationsEnabled ?? false);
-          setFixedLinksState(data.settings.fixedLinks ?? DEFAULT_FIXED_LINKS);
-          setNoteGridColumnsState(data.settings.noteGridColumns ?? 2);
+    const unsubscribe = onSnapshot(
+      userDocRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          // FirestoreにデータがあればStateに反映
+          const data = docSnap.data();
+          const settings = data.settings ?? {};
+          setRefreshIntervalState(settings.refreshInterval ?? 1);
+          setNotificationMinutesState(settings.notificationMinutes ?? [5, 15]);
+          setNotificationsEnabledState(settings.notificationsEnabled ?? false);
+          setFixedLinksState(settings.fixedLinks ?? DEFAULT_FIXED_LINKS);
+          setNoteGridColumnsState(settings.noteGridColumns ?? 2);
+          setCustomLinksState(data.customLinks ?? []);
+          setFoldersState(data.folders ?? []);
         }
-        setCustomLinksState(data.customLinks ?? []);
-        setFoldersState(data.folders ?? []);
+        // Firestoreにデータがない場合はデフォルト値を維持
+      },
+      (error) => {
+        console.error('Failed to load settings from Firestore:', error);
       }
-      // Firestoreにデータがない場合はデフォルト値を維持
-    });
+    );
 
     return () => unsubscribe();
   }, [user]);

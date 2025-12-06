@@ -1,8 +1,8 @@
 'use client';
 
-import { X, Plus, Trash2, Bell, Edit2, Link as LinkIcon, LayoutGrid } from 'lucide-react';
-import { useSettings, FixedLink } from '@/contexts/AuthContext';
-import { useState, useEffect } from 'react';
+import { X, Plus, Trash2, Bell, Edit2, Link as LinkIcon, LayoutGrid, Download, Upload } from 'lucide-react';
+import { useSettings, FixedLink, CustomLink, LinkFolder } from '@/contexts/AuthContext';
+import { useState, useEffect, useRef } from 'react';
 import { ICON_OPTIONS } from '@/lib/constants';
 
 interface SettingsModalProps {
@@ -11,6 +11,16 @@ interface SettingsModalProps {
 }
 
 const PRESET_TIMES = [1, 5, 10, 15, 30, 60];
+
+interface SettingsData {
+  refreshInterval: number;
+  notificationMinutes: number[];
+  notificationsEnabled: boolean;
+  fixedLinks: FixedLink[];
+  customLinks: CustomLink[];
+  folders: LinkFolder[];
+  noteGridColumns: number;
+}
 
 export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const {
@@ -22,6 +32,10 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setNotificationsEnabled,
     fixedLinks,
     setFixedLinks,
+    customLinks,
+    setCustomLinks,
+    folders,
+    setFolders,
     noteGridColumns,
     setNoteGridColumns,
   } = useSettings();
@@ -32,6 +46,7 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const [tempFixedLinks, setTempFixedLinks] = useState<FixedLink[]>(() => fixedLinks);
   const [editingLink, setEditingLink] = useState<FixedLink | null>(null);
   const [tempNoteGridColumns, setTempNoteGridColumns] = useState(() => noteGridColumns);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -127,6 +142,81 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const getIconComponent = (iconName: string) => {
     const icon = ICON_OPTIONS.find(opt => opt.name === iconName);
     return icon ? icon.component : LinkIcon;
+  };
+
+  // エクスポート機能
+  const handleExport = () => {
+    const settings: SettingsData = {
+      refreshInterval,
+      notificationMinutes,
+      notificationsEnabled,
+      fixedLinks,
+      customLinks,
+      folders,
+      noteGridColumns,
+    };
+    const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `dashboard-settings-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // インポート機能
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target?.result as string) as Partial<SettingsData>;
+
+        // 各設定を検証して適用
+        if (typeof data.refreshInterval === 'number' && data.refreshInterval >= 1 && data.refreshInterval <= 60) {
+          setRefreshInterval(data.refreshInterval);
+        }
+        if (Array.isArray(data.notificationMinutes) && data.notificationMinutes.every(n => typeof n === 'number')) {
+          setNotificationMinutes(data.notificationMinutes);
+        }
+        if (typeof data.notificationsEnabled === 'boolean') {
+          setNotificationsEnabled(data.notificationsEnabled);
+        }
+        if (Array.isArray(data.fixedLinks)) {
+          setFixedLinks(data.fixedLinks);
+        }
+        if (Array.isArray(data.customLinks)) {
+          setCustomLinks(data.customLinks);
+        }
+        if (Array.isArray(data.folders)) {
+          setFolders(data.folders);
+        }
+        if (typeof data.noteGridColumns === 'number' && data.noteGridColumns >= 1 && data.noteGridColumns <= 4) {
+          setNoteGridColumns(data.noteGridColumns);
+        }
+
+        // 一時的なstateも更新
+        setTempInterval(data.refreshInterval ?? refreshInterval);
+        setTempNotifications(data.notificationMinutes ?? notificationMinutes);
+        setTempEnabled(data.notificationsEnabled ?? notificationsEnabled);
+        setTempFixedLinks(data.fixedLinks ?? fixedLinks);
+        setTempNoteGridColumns(data.noteGridColumns ?? noteGridColumns);
+
+        alert('設定をインポートしました');
+      } catch {
+        alert('設定ファイルの読み込みに失敗しました。正しいJSON形式か確認してください。');
+      }
+    };
+    reader.readAsText(file);
+
+    // ファイル入力をリセット（同じファイルを再度選択できるように）
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   if (!isOpen) return null;
@@ -323,6 +413,39 @@ export default function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   {cols}列
                 </button>
               ))}
+            </div>
+          </div>
+
+          {/* Export/Import Section */}
+          <div className="border-t border-gray-200 dark:border-slate-700 pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Download className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                設定のバックアップ
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+              設定をJSON形式でエクスポート・インポートできます
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={handleExport}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                エクスポート
+              </button>
+              <label className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium border border-gray-300 dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-300 transition-colors cursor-pointer">
+                <Upload className="w-4 h-4" />
+                インポート
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleImport}
+                  className="hidden"
+                />
+              </label>
             </div>
           </div>
         </div>
